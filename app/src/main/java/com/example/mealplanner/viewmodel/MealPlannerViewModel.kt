@@ -126,10 +126,12 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updatePersistDataBetweenLaunches(enabled: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.setPersistDataBetweenLaunches(enabled)
             if (enabled) {
+                // Persist current in-memory meals first so settings observers never reload stale data.
                 mealsRepository.saveMeals(meals.value)
+                settingsDataStore.setPersistDataBetweenLaunches(true)
             } else {
+                settingsDataStore.setPersistDataBetweenLaunches(false)
                 mealsRepository.saveMeals(emptyList())
                 _meals.value = emptyList()
             }
