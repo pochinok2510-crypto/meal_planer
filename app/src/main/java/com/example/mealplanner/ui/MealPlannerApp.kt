@@ -1,13 +1,13 @@
 package com.example.mealplanner.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -19,7 +19,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,8 +37,23 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val meals by viewModel.meals.collectAsState()
-    val selectedMeals by viewModel.selectedMealNames.collectAsState()
+    val groups by viewModel.groups.collectAsState()
+    val selectedMeals by viewModel.selectedMealIds.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val dayCount by viewModel.dayCount.collectAsState()
+
+    val savePdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        val saved = viewModel.saveShoppingListPdfToUri(uri)
+        Toast.makeText(
+            context,
+            if (saved) "PDF сохранён" else "Не удалось сохранить PDF",
+            Toast.LENGTH_LONG
+        ).show()
+    }
 
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.ShoppingList, Screen.Settings)
 
@@ -90,9 +104,14 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
             composable(Screen.Menu.route) {
                 MenuScreen(
                     meals = meals,
-                    selectedMeals = selectedMeals,
+                    groups = groups,
+                    selectedMealIds = selectedMeals,
                     onMealSelectionToggle = viewModel::toggleMealSelection,
                     onRemoveMeal = viewModel::removeMeal,
+                    onMoveMealToGroup = viewModel::moveMealToGroup,
+                    onDuplicateMealToGroup = viewModel::duplicateMealToGroup,
+                    onCreateGroup = viewModel::addGroup,
+                    onDeleteGroup = viewModel::removeGroup,
                     onNavigateToAddMeal = { navController.navigate(Screen.AddMeal.route) },
                     onNavigateToShopping = { navController.navigate(Screen.ShoppingList.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
@@ -100,9 +119,10 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
             }
             composable(Screen.AddMeal.route) {
                 AddMealScreen(
+                    groups = groups,
                     onBack = { navController.popBackStack() },
-                    onSaveMeal = { name, ingredients ->
-                        viewModel.addMeal(name, ingredients)
+                    onSaveMeal = { name, group, ingredients ->
+                        viewModel.addMeal(name, group, ingredients)
                         navController.popBackStack()
                     }
                 )
@@ -110,16 +130,30 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
             composable(Screen.ShoppingList.route) {
                 ShoppingListScreen(
                     ingredients = viewModel.getAggregatedShoppingList(),
+                    dayCount = dayCount,
+                    isIngredientPurchased = viewModel::isIngredientPurchased,
+                    onIngredientPurchasedChange = viewModel::setIngredientPurchased,
                     onBack = { navController.popBackStack() },
                     onClear = viewModel::clearShoppingSelection,
-                    onExport = {
-                        val file = viewModel.exportShoppingListToPdf()
-                        val message = if (file == null) {
-                            "Нечего экспортировать"
-                        } else {
-                            "PDF сохранён: ${file.name}"
-                        }
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    onDayCountChange = viewModel::updateDayCount,
+                    onShareViaViber = {
+                        shareToApp(
+                            context = context,
+                            packageName = "com.viber.voip",
+                            message = viewModel.buildShoppingListMessage(),
+                            fallbackLabel = "Вайбер"
+                        )
+                    },
+                    onShareViaTelegram = {
+                        shareToApp(
+                            context = context,
+                            packageName = "org.telegram.messenger",
+                            message = viewModel.buildShoppingListMessage(),
+                            fallbackLabel = "Телеграм"
+                        )
+                    },
+                    onSavePdf = {
+                        savePdfLauncher.launch("shopping-list-${System.currentTimeMillis()}.pdf")
                     }
                 )
             }
@@ -147,4 +181,37 @@ private fun labelFor(screen: Screen): String = when (screen) {
     Screen.AddMeal -> "Добавить"
     Screen.ShoppingList -> "Покупки"
     Screen.Settings -> "Настройки"
+}
+
+private fun shareToApp(
+    context: android.content.Context,
+    packageName: String,
+    message: String,
+    fallbackLabel: String
+) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, message)
+        setPackage(packageName)
+    }
+
+    runCatching {
+        context.startActivity(intent)
+    }.recoverCatching {
+        val chooser = Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, message)
+            },
+            "Выберите приложение"
+        )
+        context.startActivity(chooser)
+    }.onFailure {
+        val messageText = if (it is ActivityNotFoundException) {
+            "$fallbackLabel недоступен"
+        } else {
+            "Не удалось отправить"
+        }
+        Toast.makeText(context, messageText, Toast.LENGTH_LONG).show()
+    }
 }
