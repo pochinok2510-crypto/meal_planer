@@ -1,5 +1,6 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -126,8 +127,8 @@ fun MenuScreen(
                         )
                     }
 
-                    if (isExpanded) {
-                        items(mealsInGroup, key = { it.id }) { meal ->
+                    items(mealsInGroup, key = { it.id }) { meal ->
+                        AnimatedVisibility(visible = isExpanded) {
                             MealCard(
                                 meal = meal,
                                 groups = groups,
@@ -226,7 +227,7 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggleExpanded) {
-            Text(if (isExpanded) "↑" else "↓")
+            Text(if (isExpanded) "▲" else "▼")
         }
         Text(
             text = "$group ($mealCount)",

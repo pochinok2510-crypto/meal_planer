@@ -33,8 +33,7 @@ fun ShoppingListScreen(
     onBack: () -> Unit,
     onClear: () -> Unit,
     onDayCountChange: (Int) -> Unit,
-    onShareViaViber: () -> Unit,
-    onShareViaTelegram: () -> Unit,
+    onSend: () -> Unit,
     onSavePdf: () -> Unit
 ) {
     val showSendOptions = remember { mutableStateOf(false) }
@@ -110,21 +109,12 @@ fun ShoppingListScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
-                            onShareViaViber()
+                            onSend()
                             showSendOptions.value = false
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Вайбер")
-                    }
-                    Button(
-                        onClick = {
-                            onShareViaTelegram()
-                            showSendOptions.value = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Телеграм")
+                        Text("Открыть меню отправки")
                     }
                     Button(
                         onClick = {
