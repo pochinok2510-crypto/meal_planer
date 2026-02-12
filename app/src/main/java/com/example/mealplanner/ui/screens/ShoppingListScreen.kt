@@ -22,12 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
+import java.util.Locale
 
 @Composable
 fun ShoppingListScreen(
     ingredients: List<Ingredient>,
     dayCount: Int,
-    isIngredientPurchased: (Ingredient) -> Boolean,
+    purchasedIngredientKeys: Set<String>,
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
     onBack: () -> Unit,
     onClear: () -> Unit,
@@ -64,6 +65,7 @@ fun ShoppingListScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(ingredients, key = { "${it.name}_${it.unit}" }) { ingredient ->
+                    val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
@@ -72,7 +74,7 @@ fun ShoppingListScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
-                                checked = isIngredientPurchased(ingredient),
+                                checked = isPurchased,
                                 onCheckedChange = { checked ->
                                     onIngredientPurchasedChange(ingredient, checked)
                                 }
@@ -143,4 +145,8 @@ fun ShoppingListScreen(
             }
         )
     }
+}
+
+private fun Ingredient.storageKey(): String {
+    return "${name.trim().lowercase(Locale.getDefault())}|${unit.trim().lowercase(Locale.getDefault())}"
 }

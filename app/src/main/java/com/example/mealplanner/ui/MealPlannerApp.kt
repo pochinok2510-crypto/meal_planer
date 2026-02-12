@@ -41,6 +41,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val selectedMeals by viewModel.selectedMealIds.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val dayCount by viewModel.dayCount.collectAsState()
+    val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
 
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
@@ -112,6 +113,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onDuplicateMealToGroup = viewModel::duplicateMealToGroup,
                     onCreateGroup = viewModel::addGroup,
                     onDeleteGroup = viewModel::removeGroup,
+                    onEditGroup = viewModel::renameGroup,
                     onNavigateToAddMeal = { navController.navigate(Screen.AddMeal.route) },
                     onNavigateToShopping = { navController.navigate(Screen.ShoppingList.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
@@ -131,7 +133,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 ShoppingListScreen(
                     ingredients = viewModel.getAggregatedShoppingList(),
                     dayCount = dayCount,
-                    isIngredientPurchased = viewModel::isIngredientPurchased,
+                    purchasedIngredientKeys = purchasedIngredientKeys,
                     onIngredientPurchasedChange = viewModel::setIngredientPurchased,
                     onBack = { navController.popBackStack() },
                     onClear = viewModel::clearShoppingSelection,

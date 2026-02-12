@@ -42,7 +42,7 @@ class MealsRepository(context: Context) {
                 val type = object : TypeToken<PlannerState>() {}.type
                 val state: PlannerState = gson.fromJson(serialized, type)
                 state.copy(
-                    groups = (DEFAULT_GROUPS + state.groups).distinct(),
+                    groups = (DEFAULT_GROUPS + state.groups + UNCATEGORIZED_GROUP).distinct(),
                     purchasedIngredientKeys = state.purchasedIngredientKeys.distinct()
                 )
             }
@@ -54,6 +54,7 @@ class MealsRepository(context: Context) {
     companion object {
         private const val PREFS_NAME = "meal_planner_data"
         private const val KEY_STATE = "planner_state"
+        const val UNCATEGORIZED_GROUP = "Без категории"
         val DEFAULT_GROUPS = listOf("Завтрак", "Перекус", "Обед", "Ужин", "Десерт")
     }
 }
