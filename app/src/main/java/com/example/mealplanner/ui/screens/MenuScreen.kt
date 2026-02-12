@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -38,8 +37,6 @@ import com.example.mealplanner.model.Meal
 fun MenuScreen(
     meals: List<Meal>,
     groups: List<String>,
-    selectedMealIds: Set<String>,
-    onMealSelectionToggle: (String) -> Unit,
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -131,8 +128,6 @@ fun MenuScreen(
                             MealCard(
                                 meal = meal,
                                 groups = groups,
-                                isSelected = meal.id in selectedMealIds,
-                                onToggleSelection = { onMealSelectionToggle(meal.id) },
                                 onRemove = { onRemoveMeal(meal) },
                                 onMove = { target -> onMoveMealToGroup(meal, target) },
                                 onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
@@ -249,8 +244,6 @@ private fun GroupHeader(
 private fun MealCard(
     meal: Meal,
     groups: List<String>,
-    isSelected: Boolean,
-    onToggleSelection: () -> Unit,
     onRemove: () -> Unit,
     onMove: (String) -> Unit,
     onDuplicate: (String) -> Unit
@@ -262,7 +255,7 @@ private fun MealCard(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = onToggleSelection,
+                onClick = {},
                 onLongClick = onRemove
             )
     ) {
@@ -271,10 +264,6 @@ private fun MealCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelection() }
-                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = meal.name, style = MaterialTheme.typography.titleMedium)
                     Text("Ингредиентов: ${meal.ingredients.size}")
