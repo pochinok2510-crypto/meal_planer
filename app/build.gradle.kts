@@ -1,7 +1,11 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.kapt")
+< codex/add-weekly-meal-planning-feature-uzpias
+   
+    id("org.jetbrains.kotlin.kapt")
+ main
 }
 
 android {
@@ -71,7 +75,10 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+ codex/add-weekly-meal-planning-feature-uzpias
+    
+    kapt("androidx.room:room-compiler:2.6.1")
+ main
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.google.code.gson:gson:2.10.1")
