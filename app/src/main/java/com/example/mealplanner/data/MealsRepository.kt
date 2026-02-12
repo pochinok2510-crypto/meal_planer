@@ -1,8 +1,11 @@
 package com.example.mealplanner.data
 
 import android.content.Context
+import com.example.mealplanner.data.local.MealPlannerDatabase
+import com.example.mealplanner.data.local.PlannerStateEntity
 import com.example.mealplanner.model.Ingredient
 import com.example.mealplanner.model.Meal
+import com.example.mealplanner.model.WeeklyPlanAssignment
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -10,19 +13,45 @@ import java.util.UUID
 
 class MealsRepository(context: Context) {
 
+    private val dao = MealPlannerDatabase.getInstance(context).plannerStateDao()
     private val sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
     fun saveState(state: PlannerState) {
-        val serialized = gson.toJson(state)
-        sharedPreferences.edit().putString(KEY_STATE, serialized).apply()
+        val entity = PlannerStateEntity(
+            mealsJson = gson.toJson(state.meals),
+            groupsJson = gson.toJson(state.groups),
+            purchasedIngredientKeysJson = gson.toJson(state.purchasedIngredientKeys),
+            weeklyPlanJson = gson.toJson(state.weeklyPlan),
+            dayCount = state.dayMultiplier
+        )
+        dao.upsert(entity)
     }
 
     fun loadState(): PlannerState {
+        dao.getById()?.let { entity ->
+            return PlannerState(
+                meals = gson.fromJson(entity.mealsJson, object : TypeToken<List<Meal>>() {}.type) ?: emptyList(),
+                groups = normalizeGroups(
+                    gson.fromJson(entity.groupsJson, object : TypeToken<List<String>>() {}.type)
+                        ?: DEFAULT_GROUPS
+                ),
+                purchasedIngredientKeys = (gson.fromJson(entity.purchasedIngredientKeysJson, object : TypeToken<List<String>>() {}.type)
+                    ?: emptyList()).distinct(),
+                weeklyPlan = gson.fromJson(entity.weeklyPlanJson, object : TypeToken<List<WeeklyPlanAssignment>>() {}.type)
+                    ?: emptyList(),
+                dayMultiplier = entity.dayCount.coerceIn(1, 30)
+            )
+        }
+
+        return migrateFromLegacySharedPreferences()
+    }
+
+    private fun migrateFromLegacySharedPreferences(): PlannerState {
         val serialized = sharedPreferences.getString(KEY_STATE, null)
             ?: return PlannerState(groups = DEFAULT_GROUPS)
 
-        return runCatching {
+        val migrated = runCatching {
             val json = JsonParser.parseString(serialized)
             if (json.isJsonArray) {
                 val type = object : TypeToken<List<LegacyMeal>>() {}.type
@@ -39,16 +68,27 @@ class MealsRepository(context: Context) {
                     groups = DEFAULT_GROUPS
                 )
             } else {
-                val type = object : TypeToken<PlannerState>() {}.type
-                val state: PlannerState = gson.fromJson(serialized, type)
-                state.copy(
-                    groups = (DEFAULT_GROUPS + state.groups + UNCATEGORIZED_GROUP).distinct(),
-                    purchasedIngredientKeys = state.purchasedIngredientKeys.distinct()
+                val type = object : TypeToken<LegacyPlannerState>() {}.type
+                val state: LegacyPlannerState = gson.fromJson(serialized, type)
+                PlannerState(
+                    meals = state.meals,
+                    groups = normalizeGroups(state.groups),
+                    purchasedIngredientKeys = state.purchasedIngredientKeys.distinct(),
+                    weeklyPlan = state.weeklyPlan,
+                    dayMultiplier = state.dayCount.coerceIn(1, 30)
                 )
             }
         }.getOrElse {
             PlannerState(groups = DEFAULT_GROUPS)
         }
+
+        saveState(migrated)
+        sharedPreferences.edit().remove(KEY_STATE).apply()
+        return migrated
+    }
+
+    private fun normalizeGroups(groups: List<String>): List<String> {
+        return (DEFAULT_GROUPS + groups + UNCATEGORIZED_GROUP).distinct()
     }
 
     companion object {
@@ -62,10 +102,20 @@ class MealsRepository(context: Context) {
 data class PlannerState(
     val meals: List<Meal> = emptyList(),
     val groups: List<String> = MealsRepository.DEFAULT_GROUPS,
-    val purchasedIngredientKeys: List<String> = emptyList()
+    val purchasedIngredientKeys: List<String> = emptyList(),
+    val weeklyPlan: List<WeeklyPlanAssignment> = emptyList(),
+    val dayMultiplier: Int = 1
 )
 
 private data class LegacyMeal(
     val name: String,
     val ingredients: List<Ingredient>
+)
+
+private data class LegacyPlannerState(
+    val meals: List<Meal> = emptyList(),
+    val groups: List<String> = MealsRepository.DEFAULT_GROUPS,
+    val purchasedIngredientKeys: List<String> = emptyList(),
+    val weeklyPlan: List<WeeklyPlanAssignment> = emptyList(),
+    val dayCount: Int = 1
 )
