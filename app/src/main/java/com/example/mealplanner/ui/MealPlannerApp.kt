@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -145,21 +146,8 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onBack = { navController.popBackStack() },
                     onClear = viewModel::clearShoppingSelection,
                     onDayCountChange = viewModel::updateDayCount,
-                    onShareViaViber = {
-                        shareToApp(
-                            context = context,
-                            packageName = "com.viber.voip",
-                            message = viewModel.buildShoppingListMessage(),
-                            fallbackLabel = "Вайбер"
-                        )
-                    },
-                    onShareViaTelegram = {
-                        shareToApp(
-                            context = context,
-                            packageName = "org.telegram.messenger",
-                            message = viewModel.buildShoppingListMessage(),
-                            fallbackLabel = "Телеграм"
-                        )
+                    onSend = {
+                        sharePdf(context, viewModel)
                     },
                     onSavePdf = {
                         savePdfLauncher.launch("shopping-list-${System.currentTimeMillis()}.pdf")
@@ -194,32 +182,32 @@ private fun labelFor(screen: Screen): String = when (screen) {
     Screen.Settings -> "Настройки"
 }
 
-private fun shareToApp(
+
+private fun sharePdf(
     context: android.content.Context,
-    packageName: String,
-    message: String,
-    fallbackLabel: String
+    viewModel: MealPlannerViewModel
 ) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, message)
-        setPackage(packageName)
+    val pdfFile = viewModel.createSharePdfFile()
+    if (pdfFile == null) {
+        Toast.makeText(context, "Список покупок пуст", Toast.LENGTH_LONG).show()
+        return
+    }
+
+    val authority = "${context.packageName}.fileprovider"
+    val contentUri = FileProvider.getUriForFile(context, authority, pdfFile)
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, contentUri)
+        putExtra(Intent.EXTRA_SUBJECT, "Список покупок")
+        putExtra(Intent.EXTRA_TEXT, viewModel.buildShoppingListMessage())
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
     runCatching {
-        context.startActivity(intent)
-    }.recoverCatching {
-        val chooser = Intent.createChooser(
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, message)
-            },
-            "Выберите приложение"
-        )
-        context.startActivity(chooser)
+        context.startActivity(Intent.createChooser(shareIntent, "Отправить список"))
     }.onFailure {
         val messageText = if (it is ActivityNotFoundException) {
-            "$fallbackLabel недоступен"
+            "Приложения для отправки не найдены"
         } else {
             "Не удалось отправить"
         }
