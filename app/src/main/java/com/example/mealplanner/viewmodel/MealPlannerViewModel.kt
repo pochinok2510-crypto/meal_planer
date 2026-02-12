@@ -77,12 +77,50 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun removeGroup(name: String) {
         if (name in MealsRepository.DEFAULT_GROUPS) return
+        if (name == MealsRepository.UNCATEGORIZED_GROUP) return
 
-        val deletedIds = meals.value.filter { it.group == name }.map { it.id }.toSet()
-        _groups.update { current -> current.filterNot { it == name } }
-        _meals.update { currentMeals -> currentMeals.filterNot { it.group == name } }
-        _selectedMealIds.update { selected -> selected - deletedIds }
+        _groups.update { current ->
+            val withoutDeleted = current.filterNot { it == name }
+            if (MealsRepository.UNCATEGORIZED_GROUP in withoutDeleted) {
+                withoutDeleted
+            } else {
+                withoutDeleted + MealsRepository.UNCATEGORIZED_GROUP
+            }
+        }
+        _meals.update { currentMeals ->
+            currentMeals.map { meal ->
+                if (meal.group == name) {
+                    meal.copy(group = MealsRepository.UNCATEGORIZED_GROUP)
+                } else {
+                    meal
+                }
+            }
+        }
         persistPlannerStateIfEnabled()
+    }
+
+    fun renameGroup(oldName: String, newName: String): Boolean {
+        if (oldName in MealsRepository.DEFAULT_GROUPS || oldName == MealsRepository.UNCATEGORIZED_GROUP) {
+            return false
+        }
+
+        val normalized = newName.trim()
+        if (normalized.isBlank()) return false
+        if (normalized.equals(oldName, ignoreCase = true)) return false
+
+        val exists = groups.value.any { it.equals(normalized, ignoreCase = true) }
+        if (exists) return false
+
+        _groups.update { current ->
+            current.map { if (it == oldName) normalized else it }
+        }
+        _meals.update { currentMeals ->
+            currentMeals.map { meal ->
+                if (meal.group == oldName) meal.copy(group = normalized) else meal
+            }
+        }
+        persistPlannerStateIfEnabled()
+        return true
     }
 
     fun addMeal(name: String, group: String, ingredients: List<Ingredient>) {
