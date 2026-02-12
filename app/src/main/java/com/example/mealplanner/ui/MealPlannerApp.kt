@@ -30,6 +30,7 @@ import com.example.mealplanner.ui.screens.AddMealScreen
 import com.example.mealplanner.ui.screens.MenuScreen
 import com.example.mealplanner.ui.screens.SettingsScreen
 import com.example.mealplanner.ui.screens.ShoppingListScreen
+import com.example.mealplanner.ui.screens.WeeklyPlannerScreen
 import com.example.mealplanner.viewmodel.MealPlannerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +40,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val context = LocalContext.current
     val meals by viewModel.meals.collectAsState()
     val groups by viewModel.groups.collectAsState()
-    val selectedMeals by viewModel.selectedMealIds.collectAsState()
+    val weeklyPlan by viewModel.weeklyPlan.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val dayCount by viewModel.dayCount.collectAsState()
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
@@ -57,7 +58,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         ).show()
     }
 
-    val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.ShoppingList, Screen.Settings)
+    val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
 
     Scaffold(
         topBar = {
@@ -67,6 +68,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     when (currentRoute) {
                         Screen.Menu.route -> "Меню"
                         Screen.AddMeal.route -> "Добавить блюдо"
+                        Screen.WeeklyPlanner.route -> "План недели"
                         Screen.ShoppingList.route -> "Список покупок"
                         Screen.Settings.route -> "Настройки"
                         else -> "Meal Planner"
@@ -107,8 +109,6 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 MenuScreen(
                     meals = meals,
                     groups = groups,
-                    selectedMealIds = selectedMeals,
-                    onMealSelectionToggle = viewModel::toggleMealSelection,
                     onRemoveMeal = viewModel::removeMeal,
                     onMoveMealToGroup = viewModel::moveMealToGroup,
                     onDuplicateMealToGroup = viewModel::duplicateMealToGroup,
@@ -128,6 +128,13 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                         viewModel.addMeal(name, group, ingredients)
                         navController.popBackStack()
                     }
+                )
+            }
+            composable(Screen.WeeklyPlanner.route) {
+                WeeklyPlannerScreen(
+                    meals = meals,
+                    weeklyPlan = weeklyPlan,
+                    onAssignMeal = viewModel::assignMealToSlot
                 )
             }
             composable(Screen.ShoppingList.route) {
@@ -162,6 +169,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
 private fun iconFor(screen: Screen): String = when (screen) {
     Screen.Menu -> "📋"
     Screen.AddMeal -> "➕"
+    Screen.WeeklyPlanner -> "📅"
     Screen.ShoppingList -> "🛒"
     Screen.Settings -> "⚙️"
 }
@@ -169,6 +177,7 @@ private fun iconFor(screen: Screen): String = when (screen) {
 private fun labelFor(screen: Screen): String = when (screen) {
     Screen.Menu -> "Меню"
     Screen.AddMeal -> "Добавить"
+    Screen.WeeklyPlanner -> "Неделя"
     Screen.ShoppingList -> "Покупки"
     Screen.Settings -> "Настройки"
 }
