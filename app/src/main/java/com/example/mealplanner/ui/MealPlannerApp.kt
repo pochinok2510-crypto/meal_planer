@@ -58,28 +58,19 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         ).show()
     }
 
-    val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val currentScreen = Screen.bottomNavigationItems.firstOrNull { it.route == currentRoute }
 
     Scaffold(
         topBar = {
-            val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
             TopAppBar(title = {
-                Text(
-                    when (currentRoute) {
-                        Screen.Menu.route -> "Меню"
-                        Screen.AddMeal.route -> "Добавить блюдо"
-                        Screen.WeeklyPlanner.route -> "План недели"
-                        Screen.ShoppingList.route -> "Список покупок"
-                        Screen.Settings.route -> "Настройки"
-                        else -> "Meal Planner"
-                    }
-                )
+                Text(currentScreen?.title ?: "Meal Planner")
             })
         },
         bottomBar = {
             NavigationBar {
-                destinations.forEach { screen ->
-                    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                Screen.bottomNavigationItems.forEach { screen ->
                     NavigationBarItem(
                         selected = currentRoute == screen.route,
                         onClick = {
@@ -91,8 +82,8 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                                 restoreState = true
                             }
                         },
-                        icon = { Text(iconFor(screen)) },
-                        label = { Text(labelFor(screen)) }
+                        icon = { Text(screen.icon) },
+                        label = { Text(screen.label) }
                     )
                 }
             }
@@ -165,23 +156,6 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         }
     }
 }
-
-private fun iconFor(screen: Screen): String = when (screen) {
-    Screen.Menu -> "📋"
-    Screen.AddMeal -> "➕"
-    Screen.WeeklyPlanner -> "📅"
-    Screen.ShoppingList -> "🛒"
-    Screen.Settings -> "⚙️"
-}
-
-private fun labelFor(screen: Screen): String = when (screen) {
-    Screen.Menu -> "Меню"
-    Screen.AddMeal -> "Добавить"
-    Screen.WeeklyPlanner -> "Неделя"
-    Screen.ShoppingList -> "Покупки"
-    Screen.Settings -> "Настройки"
-}
-
 
 private fun sharePdf(
     context: android.content.Context,
