@@ -222,21 +222,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
         return "$title\n$body"
     }
 
-    fun exportShoppingListToPdfFile(): File? {
-        val ingredients = getAggregatedShoppingList()
-        if (ingredients.isEmpty()) return null
-
-        val outputDir = getApplication<Application>().getExternalFilesDir(null)
-            ?: getApplication<Application>().filesDir
-        val outputFile = File(outputDir, "shopping-list-${System.currentTimeMillis()}.pdf")
-
-        outputFile.outputStream().use { output ->
-            writePdf(ingredients, output)
-        }
-        onAfterShareCompleted()
-        return outputFile
-    }
-
     fun createSharePdfFile(): File? {
         val ingredients = getAggregatedShoppingList()
         if (ingredients.isEmpty()) return null
