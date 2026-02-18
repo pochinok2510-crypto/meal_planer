@@ -35,7 +35,7 @@ import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
 
 @OptIn(ExperimentalFoundationApi::class)
-@@ -41,107 +42,193 @@ fun MenuScreen(
+ fun MenuScreen(
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -227,7 +227,7 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggleExpanded) {
-@@ -161,55 +248,77 @@ private fun GroupHeader(
+ private fun GroupHeader(
             }
         }
     }
