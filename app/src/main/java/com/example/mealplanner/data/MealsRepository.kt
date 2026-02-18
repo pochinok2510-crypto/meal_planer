@@ -37,9 +37,9 @@ class MealsRepository(context: Context) {
                         ?: DEFAULT_GROUPS
                 ),
                 purchasedIngredientKeys = (gson.fromJson(entity.purchasedIngredientKeysJson, object : TypeToken<List<String>>() {}.type)
-                    ?: emptyList()).distinct(),
+                    ?: emptyList<String>()).distinct(),
                 weeklyPlan = gson.fromJson(entity.weeklyPlanJson, object : TypeToken<List<WeeklyPlanAssignment>>() {}.type)
-                    ?: emptyList(),
+                    ?: emptyList<WeeklyPlanAssignment>(),
                 dayMultiplier = entity.dayCount.coerceIn(1, 30)
             )
         }
