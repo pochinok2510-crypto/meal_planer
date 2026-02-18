@@ -5,7 +5,9 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.example.mealplanner.data.IngredientRepository
 import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.data.PlannerState
 import com.example.mealplanner.data.SettingsDataStore
@@ -16,18 +18,42 @@ import com.example.mealplanner.model.PlanDay
 import com.example.mealplanner.model.WeeklyPlanAssignment
 import com.example.mealplanner.model.SettingsState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 
-class MealPlannerViewModel(application: Application) : AndroidViewModel(application) {
+data class MealIngredientDraft(
+    val name: String,
+    val unit: String,
+    val quantityInput: String
+)
+
+data class AddMealUiState(
+    val mealName: String = "",
+    val selectedGroup: String = "",
+    val ingredientQuery: String = "",
+    val ingredientUnitInput: String = "",
+    val ingredientQuantityInput: String = "",
+    val selectedIngredients: List<MealIngredientDraft> = emptyList(),
+    val error: String? = null
+)
+
+class MealPlannerViewModel(
+    application: Application,
+    private val savedStateHandle: SavedStateHandle
+) : AndroidViewModel(application) {
 
     private val mealsRepository = MealsRepository(application)
+    private val ingredientRepository = IngredientRepository(application)
     private val settingsDataStore = SettingsDataStore(application)
 
     private val _meals = MutableStateFlow(emptyList<Meal>())
@@ -47,6 +73,22 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _settings = MutableStateFlow(SettingsState())
     val settings: StateFlow<SettingsState> = _settings.asStateFlow()
+
+    val ingredientCatalog = ingredientRepository.getAllIngredients()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _addMealUiState = MutableStateFlow(
+        AddMealUiState(
+            mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
+            selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
+            ingredientQuery = savedStateHandle[KEY_INGREDIENT_QUERY] ?: "",
+            ingredientUnitInput = savedStateHandle[KEY_INGREDIENT_UNIT] ?: "",
+            ingredientQuantityInput = savedStateHandle[KEY_INGREDIENT_QUANTITY] ?: "",
+            selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
+            error = savedStateHandle[KEY_ADD_MEAL_ERROR]
+        )
+    )
+    val addMealUiState: StateFlow<AddMealUiState> = _addMealUiState.asStateFlow()
 
     init {
         observeSettings()
@@ -139,6 +181,147 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
         )
         _meals.update { it + meal }
         persistPlannerStateIfEnabled()
+    }
+
+    fun onAddMealScreenVisible(availableGroups: List<String>) {
+        val current = _addMealUiState.value
+        if (current.selectedGroup.isNotBlank()) return
+        val defaultGroup = availableGroups.firstOrNull().orEmpty()
+        if (defaultGroup.isBlank()) return
+        updateAddMealState { it.copy(selectedGroup = defaultGroup) }
+    }
+
+    fun updateAddMealName(value: String) {
+        updateAddMealState { it.copy(mealName = value, error = null) }
+    }
+
+    fun updateAddMealGroup(value: String) {
+        updateAddMealState { it.copy(selectedGroup = value, error = null) }
+    }
+
+    fun updateIngredientQuery(value: String) {
+        val existing = ingredientCatalog.value.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) }
+        updateAddMealState {
+            it.copy(
+                ingredientQuery = value,
+                ingredientUnitInput = existing?.unit ?: it.ingredientUnitInput,
+                error = null
+            )
+        }
+    }
+
+    fun updateIngredientUnitInput(value: String) {
+        updateAddMealState { it.copy(ingredientUnitInput = value, error = null) }
+    }
+
+    fun updateIngredientQuantityInput(value: String) {
+        updateAddMealState { it.copy(ingredientQuantityInput = value, error = null) }
+    }
+
+    fun selectIngredientFromCatalog(name: String, unit: String) {
+        updateAddMealState {
+            it.copy(
+                ingredientQuery = name,
+                ingredientUnitInput = unit,
+                error = null
+            )
+        }
+    }
+
+    fun addIngredientToMealDraft() {
+        val state = _addMealUiState.value
+        val normalizedName = state.ingredientQuery.trim()
+        val quantity = state.ingredientQuantityInput.trim().toDoubleOrNull()
+        val existingIngredient = ingredientCatalog.value.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
+        val normalizedUnit = (existingIngredient?.unit ?: state.ingredientUnitInput).trim()
+
+        when {
+            normalizedName.isBlank() -> updateAddMealState { it.copy(error = "Выберите ингредиент") }
+            quantity == null || quantity <= 0 -> updateAddMealState { it.copy(error = "Количество должно быть числом больше 0") }
+            normalizedUnit.isBlank() -> updateAddMealState { it.copy(error = "Введите единицу измерения") }
+            else -> {
+                if (existingIngredient == null) {
+                    viewModelScope.launch {
+                        ingredientRepository.insertOrIgnore(
+                            com.example.mealplanner.data.local.Ingredient(
+                                name = normalizedName,
+                                unit = normalizedUnit
+                            )
+                        )
+                    }
+                }
+
+                updateAddMealState { current ->
+                    val newDraft = MealIngredientDraft(
+                        name = normalizedName,
+                        unit = normalizedUnit,
+                        quantityInput = state.ingredientQuantityInput.trim()
+                    )
+
+                    val existingIndex = current.selectedIngredients.indexOfFirst {
+                        it.name.equals(normalizedName, ignoreCase = true) && it.unit.equals(normalizedUnit, ignoreCase = true)
+                    }
+                    val updated = if (existingIndex >= 0) {
+                        current.selectedIngredients.toMutableList().apply { set(existingIndex, newDraft) }
+                    } else {
+                        current.selectedIngredients + newDraft
+                    }
+
+                    current.copy(
+                        selectedIngredients = updated,
+                        ingredientQuery = "",
+                        ingredientUnitInput = "",
+                        ingredientQuantityInput = "",
+                        error = null
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateDraftIngredientQuantity(index: Int, quantityInput: String) {
+        updateAddMealState { state ->
+            if (index !in state.selectedIngredients.indices) return@updateAddMealState state
+            val updated = state.selectedIngredients.toMutableList()
+            updated[index] = updated[index].copy(quantityInput = quantityInput)
+            state.copy(selectedIngredients = updated, error = null)
+        }
+    }
+
+    fun removeDraftIngredient(index: Int) {
+        updateAddMealState { state ->
+            if (index !in state.selectedIngredients.indices) return@updateAddMealState state
+            state.copy(selectedIngredients = state.selectedIngredients.filterIndexed { i, _ -> i != index }, error = null)
+        }
+    }
+
+    fun saveMealFromDraft(onSuccess: () -> Unit) {
+        val state = _addMealUiState.value
+        when {
+            state.mealName.isBlank() -> updateAddMealState { it.copy(error = "Название блюда не может быть пустым") }
+            state.selectedGroup.isBlank() -> updateAddMealState { it.copy(error = "Выберите группу") }
+            state.selectedIngredients.isEmpty() -> updateAddMealState { it.copy(error = "Добавьте хотя бы один ингредиент") }
+            else -> {
+                val ingredients = state.selectedIngredients.mapNotNull { draft ->
+                    val quantity = draft.quantityInput.toDoubleOrNull()
+                    if (quantity == null || quantity <= 0) null else Ingredient(draft.name, quantity, draft.unit)
+                }
+                if (ingredients.size != state.selectedIngredients.size) {
+                    updateAddMealState { it.copy(error = "Проверьте количество у всех ингредиентов") }
+                    return
+                }
+                addMeal(state.mealName, state.selectedGroup, ingredients)
+                resetAddMealDraft(keepGroup = true)
+                onSuccess()
+            }
+        }
+    }
+
+    fun resetAddMealDraft(keepGroup: Boolean = false) {
+        val selectedGroup = if (keepGroup) _addMealUiState.value.selectedGroup else ""
+        updateAddMealState {
+            AddMealUiState(selectedGroup = selectedGroup)
+        }
     }
 
     fun removeMeal(meal: Meal) {
@@ -348,5 +531,58 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
         } else {
             value.toString()
         }
+    }
+
+    private fun updateAddMealState(transform: (AddMealUiState) -> AddMealUiState) {
+        _addMealUiState.update { current ->
+            val next = transform(current)
+            savedStateHandle[KEY_MEAL_NAME] = next.mealName
+            savedStateHandle[KEY_SELECTED_GROUP] = next.selectedGroup
+            savedStateHandle[KEY_INGREDIENT_QUERY] = next.ingredientQuery
+            savedStateHandle[KEY_INGREDIENT_UNIT] = next.ingredientUnitInput
+            savedStateHandle[KEY_INGREDIENT_QUANTITY] = next.ingredientQuantityInput
+            savedStateHandle[KEY_SELECTED_INGREDIENTS] = encodeDraftIngredients(next.selectedIngredients)
+            savedStateHandle[KEY_ADD_MEAL_ERROR] = next.error
+            next
+        }
+    }
+
+    private fun encodeDraftIngredients(items: List<MealIngredientDraft>): String {
+        val array = JSONArray()
+        items.forEach { item ->
+            array.put(
+                JSONObject().apply {
+                    put("name", item.name)
+                    put("unit", item.unit)
+                    put("quantityInput", item.quantityInput)
+                }
+            )
+        }
+        return array.toString()
+    }
+
+    private fun decodeDraftIngredients(raw: String?): List<MealIngredientDraft> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val jsonArray = JSONArray(raw)
+            List(jsonArray.length()) { index ->
+                val obj = jsonArray.getJSONObject(index)
+                MealIngredientDraft(
+                    name = obj.optString("name"),
+                    unit = obj.optString("unit"),
+                    quantityInput = obj.optString("quantityInput")
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    companion object {
+        private const val KEY_MEAL_NAME = "add_meal_name"
+        private const val KEY_SELECTED_GROUP = "add_meal_group"
+        private const val KEY_INGREDIENT_QUERY = "add_meal_ingredient_query"
+        private const val KEY_INGREDIENT_UNIT = "add_meal_ingredient_unit"
+        private const val KEY_INGREDIENT_QUANTITY = "add_meal_ingredient_quantity"
+        private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
+        private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
     }
 }
