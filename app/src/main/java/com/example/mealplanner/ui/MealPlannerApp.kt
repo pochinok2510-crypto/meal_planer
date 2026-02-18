@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -44,6 +45,8 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val settings by viewModel.settings.collectAsState()
     val dayCount by viewModel.dayCount.collectAsState()
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
+    val addMealState by viewModel.addMealUiState.collectAsState()
+    val ingredientCatalog by viewModel.ingredientCatalog.collectAsState()
 
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
@@ -121,12 +124,27 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 )
             }
             composable(Screen.AddMeal.route) {
+                LaunchedEffect(groups) {
+                    viewModel.onAddMealScreenVisible(groups)
+                }
                 AddMealScreen(
                     groups = groups,
+                    ingredientCatalog = ingredientCatalog,
+                    state = addMealState,
                     onBack = { navController.popBackStack() },
-                    onSaveMeal = { name, group, ingredients ->
-                        viewModel.addMeal(name, group, ingredients)
-                        navController.popBackStack()
+                    onMealNameChange = viewModel::updateAddMealName,
+                    onGroupSelect = viewModel::updateAddMealGroup,
+                    onIngredientQueryChange = viewModel::updateIngredientQuery,
+                    onIngredientSelect = viewModel::selectIngredientFromCatalog,
+                    onIngredientUnitChange = viewModel::updateIngredientUnitInput,
+                    onIngredientQuantityChange = viewModel::updateIngredientQuantityInput,
+                    onAddIngredientClick = viewModel::addIngredientToMealDraft,
+                    onDraftQuantityChange = viewModel::updateDraftIngredientQuantity,
+                    onRemoveDraftIngredient = viewModel::removeDraftIngredient,
+                    onSaveMeal = {
+                        viewModel.saveMealFromDraft {
+                            navController.popBackStack()
+                        }
                     }
                 )
             }
