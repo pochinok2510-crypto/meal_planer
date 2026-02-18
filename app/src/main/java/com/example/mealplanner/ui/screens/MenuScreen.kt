@@ -35,7 +35,10 @@ import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
 
 @OptIn(ExperimentalFoundationApi::class)
- fun MenuScreen(
+@Composable
+fun MenuScreen(
+    meals: List<Meal>,
+    groups: List<String>,
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -227,7 +230,19 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggleExpanded) {
- private fun GroupHeader(
+            Text(if (isExpanded) "▲" else "▼")
+        }
+        Text(
+            text = "$group ($mealCount)",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f)
+        )
+        if (canManage) {
+            TextButton(onClick = onEdit) {
+                Text("Изм.")
+            }
+            TextButton(onClick = onDelete) {
+                Text("Удалить")
             }
         }
     }
