@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,30 +18,43 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.mealplanner.model.Ingredient
+import com.example.mealplanner.data.local.Ingredient
+import com.example.mealplanner.viewmodel.AddMealUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMealScreen(
     groups: List<String>,
+    ingredientCatalog: List<Ingredient>,
+    state: AddMealUiState,
     onBack: () -> Unit,
-    onSaveMeal: (String, String, List<Ingredient>) -> Unit
+    onMealNameChange: (String) -> Unit,
+    onGroupSelect: (String) -> Unit,
+    onIngredientQueryChange: (String) -> Unit,
+    onIngredientSelect: (String, String) -> Unit,
+    onIngredientUnitChange: (String) -> Unit,
+    onIngredientQuantityChange: (String) -> Unit,
+    onAddIngredientClick: () -> Unit,
+    onDraftQuantityChange: (Int, String) -> Unit,
+    onRemoveDraftIngredient: (Int) -> Unit,
+    onSaveMeal: () -> Unit
 ) {
-    var mealName by remember { mutableStateOf("") }
-    var selectedGroup by remember(groups) { mutableStateOf(groups.firstOrNull().orEmpty()) }
     var groupMenuExpanded by remember { mutableStateOf(false) }
-    var ingredientName by remember { mutableStateOf("") }
-    var ingredientAmount by remember { mutableStateOf("") }
-    var ingredientUnit by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var ingredientMenuExpanded by remember { mutableStateOf(false) }
 
-    val ingredients = remember { mutableStateListOf<Ingredient>() }
+    val filteredIngredients = remember(ingredientCatalog, state.ingredientQuery) {
+        val query = state.ingredientQuery.trim()
+        if (query.isBlank()) {
+            ingredientCatalog.take(20)
+        } else {
+            ingredientCatalog.filter { it.name.contains(query, ignoreCase = true) }.take(20)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -48,8 +63,8 @@ fun AddMealScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         OutlinedTextField(
-            value = mealName,
-            onValueChange = { mealName = it },
+            value = state.mealName,
+            onValueChange = onMealNameChange,
             label = { Text("Название блюда") },
             modifier = Modifier.fillMaxWidth()
         )
@@ -59,7 +74,7 @@ fun AddMealScreen(
             onExpandedChange = { groupMenuExpanded = !groupMenuExpanded }
         ) {
             OutlinedTextField(
-                value = selectedGroup,
+                value = state.selectedGroup,
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Группа") },
@@ -68,7 +83,7 @@ fun AddMealScreen(
                     .menuAnchor()
                     .fillMaxWidth()
             )
-            DropdownMenu(
+            ExposedDropdownMenu(
                 expanded = groupMenuExpanded,
                 onDismissRequest = { groupMenuExpanded = false }
             ) {
@@ -76,7 +91,7 @@ fun AddMealScreen(
                     DropdownMenuItem(
                         text = { Text(group) },
                         onClick = {
-                            selectedGroup = group
+                            onGroupSelect(group)
                             groupMenuExpanded = false
                         }
                     )
@@ -84,69 +99,90 @@ fun AddMealScreen(
             }
         }
 
-        OutlinedTextField(
-            value = ingredientName,
-            onValueChange = { ingredientName = it },
-            label = { Text("Ингредиент") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        ExposedDropdownMenuBox(
+            expanded = ingredientMenuExpanded,
+            onExpandedChange = { ingredientMenuExpanded = !ingredientMenuExpanded }
+        ) {
+            OutlinedTextField(
+                value = state.ingredientQuery,
+                onValueChange = {
+                    onIngredientQueryChange(it)
+                    ingredientMenuExpanded = true
+                },
+                label = { Text("Ингредиент") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = ingredientMenuExpanded) },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = ingredientMenuExpanded,
+                onDismissRequest = { ingredientMenuExpanded = false }
+            ) {
+                filteredIngredients.forEach { ingredient ->
+                    DropdownMenuItem(
+                        text = { Text("${ingredient.name} (${ingredient.unit})") },
+                        onClick = {
+                            onIngredientSelect(ingredient.name, ingredient.unit)
+                            ingredientMenuExpanded = false
+                        }
+                    )
+                }
+            }
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
-                value = ingredientAmount,
-                onValueChange = { ingredientAmount = it },
+                value = state.ingredientQuantityInput,
+                onValueChange = onIngredientQuantityChange,
                 label = { Text("Количество") },
                 modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
-                value = ingredientUnit,
-                onValueChange = { ingredientUnit = it },
+                value = state.ingredientUnitInput,
+                onValueChange = onIngredientUnitChange,
                 label = { Text("Единица") },
                 modifier = Modifier.weight(1f)
             )
         }
 
-        Button(
-            onClick = {
-                val amount = ingredientAmount.toDoubleOrNull()
-                when {
-                    ingredientName.isBlank() -> error = "Введите название ингредиента"
-                    amount == null || amount <= 0 -> error = "Количество должно быть числом больше 0"
-                    ingredientUnit.isBlank() -> error = "Введите единицу измерения"
-                    else -> {
-                        ingredients += Ingredient(ingredientName.trim(), amount, ingredientUnit.trim())
-                        ingredientName = ""
-                        ingredientAmount = ""
-                        ingredientUnit = ""
-                        error = null
-                    }
-                }
-            }
-        ) {
+        Button(onClick = onAddIngredientClick) {
             Text("Добавить ингредиент")
         }
 
-        if (ingredients.isNotEmpty()) {
+        if (state.selectedIngredients.isNotEmpty()) {
             Text("Добавленные ингредиенты:")
-            ingredients.forEach {
-                Text("• ${it.name} — ${it.amount} ${it.unit}")
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(state.selectedIngredients, key = { _, item -> "${item.name}_${item.unit}" }) { index, item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("${item.name} (${item.unit})", modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            value = item.quantityInput,
+                            onValueChange = { onDraftQuantityChange(index, it) },
+                            label = { Text("Кол-во") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(onClick = { onRemoveDraftIngredient(index) }) {
+                            Text("Удалить")
+                        }
+                    }
+                }
             }
         }
 
-        error?.let { Text(it) }
+        state.error?.let { Text(it) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onBack) { Text("← Назад") }
-            Button(onClick = {
-                when {
-                    mealName.isBlank() -> error = "Название блюда не может быть пустым"
-                    selectedGroup.isBlank() -> error = "Выберите группу"
-                    ingredients.isEmpty() -> error = "Добавьте хотя бы один ингредиент"
-                    else -> {
-                        onSaveMeal(mealName, selectedGroup, ingredients.toList())
-                    }
-                }
-            }) {
+            Button(onClick = onSaveMeal) {
                 Text("Сохранить блюдо")
             }
         }
