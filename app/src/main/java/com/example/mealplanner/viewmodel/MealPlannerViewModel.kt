@@ -296,17 +296,18 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun persistPlannerState() {
-        mealsRepository.saveState(
-            PlannerState(
-                meals = meals.value,
-                groups = groups.value,
-                purchasedIngredientKeys = purchasedIngredientKeys.value.toList(),
-                weeklyPlan = weeklyPlan.value.map { (key, mealId) ->
-                    WeeklyPlanAssignment(day = key.first, slot = key.second, mealId = mealId)
-                },
-                dayMultiplier = dayCount.value
-            )
+        val snapshot = PlannerState(
+            meals = meals.value,
+            groups = groups.value,
+            purchasedIngredientKeys = purchasedIngredientKeys.value.toList(),
+            weeklyPlan = weeklyPlan.value.map { (key, mealId) ->
+                WeeklyPlanAssignment(day = key.first, slot = key.second, mealId = mealId)
+            },
+            dayMultiplier = dayCount.value
         )
+        viewModelScope.launch {
+            mealsRepository.saveState(snapshot)
+        }
     }
 
     private fun onAfterShareCompleted() {
