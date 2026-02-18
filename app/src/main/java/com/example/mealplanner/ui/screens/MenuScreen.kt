@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -38,6 +39,8 @@ import com.example.mealplanner.model.Meal
 fun MenuScreen(
     meals: List<Meal>,
     groups: List<String>,
+    selectedMealIds: Set<String>,
+    onMealSelectionToggle: (String) -> Unit,
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -63,42 +66,7 @@ fun MenuScreen(
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = newGroupName,
-                onValueChange = { newGroupName = it },
-                label = { Text("Новая группа") },
-                modifier = Modifier.weight(1f)
-            )
-            Button(onClick = {
-                if (onCreateGroup(newGroupName)) {
-                    newGroupName = ""
-                    groupError = null
-                } else {
-                    groupError = "Группа уже существует или пустая"
-                }
-            }) {
-                Text("Создать")
-            }
-        }
-        groupError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Поиск блюд") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        if (meals.isEmpty()) {
-            Text("Пока нет блюд. Добавьте первое блюдо.", style = MaterialTheme.typography.bodyLarge)
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
+@@ -104,57 +102,55 @@ fun MenuScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 groups.forEach { group ->
@@ -124,11 +92,15 @@ fun MenuScreen(
                         )
                     }
 
+                    if (isExpanded) {
+                        items(mealsInGroup, key = { it.id }) { meal ->
                     items(mealsInGroup, key = { it.id }) { meal ->
                         AnimatedVisibility(visible = isExpanded) {
                             MealCard(
                                 meal = meal,
                                 groups = groups,
+                                isSelected = meal.id in selectedMealIds,
+                                onToggleSelection = { onMealSelectionToggle(meal.id) },
                                 onRemove = { onRemoveMeal(meal) },
                                 onMove = { target -> onMoveMealToGroup(meal, target) },
                                 onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
@@ -154,49 +126,7 @@ fun MenuScreen(
         TextButton(onClick = onNavigateToSettings, modifier = Modifier.align(Alignment.End)) {
             Text("⚙️ Настройки")
         }
-    }
-
-    groupPendingDelete?.let { group ->
-        AlertDialog(
-            onDismissRequest = { groupPendingDelete = null },
-            title = { Text("Удалить группу") },
-            text = {
-                Text("Блюда из группы «$group» будут перемещены в «${MealsRepository.UNCATEGORIZED_GROUP}». Продолжить?")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteGroup(group)
-                        groupPendingDelete = null
-                    }
-                ) { Text("Удалить") }
-            },
-            dismissButton = {
-                TextButton(onClick = { groupPendingDelete = null }) { Text("Отмена") }
-            }
-        )
-    }
-
-    groupPendingEdit?.let { group ->
-        AlertDialog(
-            onDismissRequest = { groupPendingEdit = null },
-            title = { Text("Переименовать группу") },
-            text = {
-                OutlinedTextField(
-                    value = editGroupName,
-                    onValueChange = { editGroupName = it },
-                    singleLine = true,
-                    label = { Text("Название") }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (onEditGroup(group, editGroupName)) {
-                            groupPendingEdit = null
-                        }
-                    }
-                ) { Text("Сохранить") }
+@@ -204,99 +200,93 @@ fun MenuScreen(
             },
             dismissButton = {
                 TextButton(onClick = { groupPendingEdit = null }) { Text("Отмена") }
@@ -222,6 +152,7 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggleExpanded) {
+            Text(if (isExpanded) "↑" else "↓")
             Text(if (isExpanded) "▲" else "▼")
         }
         Text(
@@ -245,6 +176,8 @@ private fun GroupHeader(
 private fun MealCard(
     meal: Meal,
     groups: List<String>,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
     onRemove: () -> Unit,
     onMove: (String) -> Unit,
     onDuplicate: (String) -> Unit
@@ -256,6 +189,7 @@ private fun MealCard(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
+                onClick = onToggleSelection,
                 onClick = {},
                 onLongClick = onRemove
             )
@@ -265,6 +199,10 @@ private fun MealCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelection() }
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = meal.name, style = MaterialTheme.typography.titleMedium)
                     Text("Ингредиентов: ${meal.ingredients.size}")
@@ -290,22 +228,3 @@ private fun MealCard(
                         onClick = {
                             onMove(group)
                             moveExpanded = false
-                        }
-                    )
-                }
-            }
-
-            DropdownMenu(expanded = duplicateExpanded, onDismissRequest = { duplicateExpanded = false }) {
-                groups.forEach { group ->
-                    DropdownMenuItem(
-                        text = { Text(group) },
-                        onClick = {
-                            onDuplicate(group)
-                            duplicateExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
