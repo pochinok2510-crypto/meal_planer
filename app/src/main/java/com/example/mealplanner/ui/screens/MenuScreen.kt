@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -34,10 +35,7 @@ import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun MenuScreen(
-    meals: List<Meal>,
-    groups: List<String>,
+@@ -41,107 +42,193 @@ fun MenuScreen(
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -63,42 +61,84 @@ fun MenuScreen(
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
-@@ -104,57 +102,55 @@ fun MenuScreen(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Поиск блюд") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = newGroupName,
+                onValueChange = {
+                    newGroupName = it
+                    groupError = null
+                },
+                label = { Text("Новая группа") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Button(
+                onClick = {
+                    val result = onCreateGroup(newGroupName)
+                    if (result) {
+                        newGroupName = ""
+                        groupError = null
+                    } else {
+                        groupError = "Не удалось добавить группу"
+                    }
+                }
             ) {
-                groups.forEach { group ->
-                    val mealsInGroup = meals.filter { meal ->
-                        meal.group == group && (normalizedSearch.isBlank() || meal.name.lowercase().contains(normalizedSearch))
-                    }
-                    val isExpanded = expandedGroups[group] ?: true
+                Text("Добавить")
+            }
+        }
 
-                    item(key = "group_$group") {
-                        GroupHeader(
-                            group = group,
-                            mealCount = mealsInGroup.size,
-                            isExpanded = isExpanded,
-                            canManage = group !in MealsRepository.DEFAULT_GROUPS && group != MealsRepository.UNCATEGORIZED_GROUP,
-                            onToggleExpanded = {
-                                expandedGroups = expandedGroups + (group to !isExpanded)
-                            },
-                            onEdit = {
-                                groupPendingEdit = group
-                                editGroupName = group
-                            },
-                            onDelete = { groupPendingDelete = group }
+        groupError?.let {
+            Text(text = it, color = MaterialTheme.colorScheme.error)
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            groups.forEach { group ->
+                val mealsInGroup = meals.filter { meal ->
+                    meal.group == group && (normalizedSearch.isBlank() || meal.name.lowercase().contains(normalizedSearch))
+                }
+                val isExpanded = expandedGroups[group] ?: true
+
+                item(key = "group_$group") {
+                    GroupHeader(
+                        group = group,
+                        mealCount = mealsInGroup.size,
+                        isExpanded = isExpanded,
+                        canManage = group !in MealsRepository.DEFAULT_GROUPS && group != MealsRepository.UNCATEGORIZED_GROUP,
+                        onToggleExpanded = {
+                            expandedGroups = expandedGroups + (group to !isExpanded)
+                        },
+                        onEdit = {
+                            groupPendingEdit = group
+                            editGroupName = group
+                        },
+                        onDelete = { groupPendingDelete = group }
+                    )
+                }
+
+                items(mealsInGroup, key = { it.id }) { meal ->
+                    AnimatedVisibility(visible = isExpanded) {
+                        MealCard(
+                            meal = meal,
+                            groups = groups,
+                            onRemove = { onRemoveMeal(meal) },
+                            onMove = { target -> onMoveMealToGroup(meal, target) },
+                            onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
                         )
-                    }
-
-                    items(mealsInGroup, key = { it.id }) { meal ->
-                        AnimatedVisibility(visible = isExpanded) {
-                            MealCard(
-                                meal = meal,
-                                groups = groups,
-                                onRemove = { onRemoveMeal(meal) },
-                                onMove = { target -> onMoveMealToGroup(meal, target) },
-                                onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
-                            )
-                        }
                     }
                 }
             }
@@ -119,7 +159,51 @@ fun MenuScreen(
         TextButton(onClick = onNavigateToSettings, modifier = Modifier.align(Alignment.End)) {
             Text("⚙️ Настройки")
         }
-@@ -204,99 +200,93 @@ fun MenuScreen(
+    }
+
+    groupPendingDelete?.let { group ->
+        AlertDialog(
+            onDismissRequest = { groupPendingDelete = null },
+            title = { Text("Удалить группу?") },
+            text = { Text("Группа '$group' будет удалена. Блюда останутся в " + MealsRepository.UNCATEGORIZED_GROUP + ".") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteGroup(group)
+                    groupPendingDelete = null
+                }) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupPendingDelete = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    groupPendingEdit?.let { group ->
+        AlertDialog(
+            onDismissRequest = { groupPendingEdit = null },
+            title = { Text("Переименовать группу") },
+            text = {
+                OutlinedTextField(
+                    value = editGroupName,
+                    onValueChange = { editGroupName = it },
+                    singleLine = true,
+                    label = { Text("Новое название") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val result = onEditGroup(group, editGroupName)
+                    if (result) {
+                        groupPendingEdit = null
+                        groupError = null
+                    } else {
+                        groupError = "Не удалось переименовать группу"
+                    }
+                }) {
+                    Text("Сохранить")
+                }
             },
             dismissButton = {
                 TextButton(onClick = { groupPendingEdit = null }) { Text("Отмена") }
@@ -145,19 +229,7 @@ private fun GroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextButton(onClick = onToggleExpanded) {
-            Text(if (isExpanded) "▲" else "▼")
-        }
-        Text(
-            text = "$group ($mealCount)",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f)
-        )
-        if (canManage) {
-            TextButton(onClick = onEdit) {
-                Text("Изм.")
-            }
-            TextButton(onClick = onDelete) {
-                Text("Удалить")
+@@ -161,55 +248,77 @@ private fun GroupHeader(
             }
         }
     }
@@ -183,7 +255,10 @@ private fun MealCard(
                 onLongClick = onRemove
             )
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -213,3 +288,22 @@ private fun MealCard(
                         onClick = {
                             onMove(group)
                             moveExpanded = false
+                        }
+                    )
+                }
+            }
+
+            DropdownMenu(expanded = duplicateExpanded, onDismissRequest = { duplicateExpanded = false }) {
+                groups.forEach { group ->
+                    DropdownMenuItem(
+                        text = { Text(group) },
+                        onClick = {
+                            onDuplicate(group)
+                            duplicateExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
