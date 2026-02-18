@@ -8,13 +8,19 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [PlannerStateEntity::class, Ingredient::class],
-    version = 2,
+    entities = [
+        PlannerStateEntity::class,
+        Ingredient::class,
+        Meal::class,
+        MealIngredientCrossRef::class
+    ],
+    version = 3,
     exportSchema = false
 )
 abstract class MealPlannerDatabase : RoomDatabase() {
     abstract fun plannerStateDao(): PlannerStateDao
     abstract fun ingredientDao(): IngredientDao
+    abstract fun mealDao(): MealDao
 
     companion object {
         @Volatile
@@ -38,6 +44,39 @@ abstract class MealPlannerDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        groupName TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meal_ingredient_cross_ref (
+                        mealId INTEGER NOT NULL,
+                        ingredientId INTEGER NOT NULL,
+                        quantity REAL NOT NULL,
+                        PRIMARY KEY(mealId, ingredientId),
+                        FOREIGN KEY(mealId) REFERENCES meals(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(ingredientId) REFERENCES ingredients(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_meal_ingredient_cross_ref_mealId ON meal_ingredient_cross_ref(mealId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_meal_ingredient_cross_ref_ingredientId ON meal_ingredient_cross_ref(ingredientId)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): MealPlannerDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -45,7 +84,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     MealPlannerDatabase::class.java,
                     "meal_planner.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
