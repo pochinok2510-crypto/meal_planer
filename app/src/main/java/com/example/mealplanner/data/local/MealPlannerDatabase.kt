@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Meal::class,
         MealIngredientCrossRef::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class MealPlannerDatabase : RoomDatabase() {
@@ -77,6 +77,45 @@ abstract class MealPlannerDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS ingredients (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        unit TEXT NOT NULL,
+                        category TEXT
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_ingredients_name ON ingredients(name)"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meal_ingredient_cross_ref (
+                        mealId INTEGER NOT NULL,
+                        ingredientId INTEGER NOT NULL,
+                        quantity REAL NOT NULL,
+                        PRIMARY KEY(mealId, ingredientId),
+                        FOREIGN KEY(mealId) REFERENCES meals(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(ingredientId) REFERENCES ingredients(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_meal_ingredient_cross_ref_mealId ON meal_ingredient_cross_ref(mealId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_meal_ingredient_cross_ref_ingredientId ON meal_ingredient_cross_ref(ingredientId)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): MealPlannerDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -84,7 +123,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     MealPlannerDatabase::class.java,
                     "meal_planner.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }
