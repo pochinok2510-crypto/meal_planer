@@ -9,7 +9,11 @@ data class MealWithIngredients(
     @Relation(
         parentColumn = "id",
         entityColumn = "id",
-        associateBy = Junction(MealIngredientCrossRef::class)
+        associateBy = Junction(
+            value = MealIngredientCrossRef::class,
+            parentColumn = "mealId",
+            entityColumn = "ingredientId"
+        )
     )
     val ingredients: List<Ingredient>
 )
