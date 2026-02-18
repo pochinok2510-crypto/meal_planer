@@ -36,8 +36,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
     private val _groups = MutableStateFlow(MealsRepository.DEFAULT_GROUPS)
     val groups: StateFlow<List<String>> = _groups.asStateFlow()
 
-    private val _selectedMealIds = MutableStateFlow(setOf<String>())
-    val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
     private val _weeklyPlan = MutableStateFlow(emptyMap<Pair<PlanDay, MealSlot>, String>())
     val weeklyPlan: StateFlow<Map<Pair<PlanDay, MealSlot>, String>> = _weeklyPlan.asStateFlow()
 
@@ -91,7 +89,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun removeMeal(meal: Meal) {
         _meals.update { current -> current.filterNot { it.id == meal.id } }
-        _selectedMealIds.update { it - meal.id }
         _weeklyPlan.update { current -> current.filterValues { it != meal.id } }
         persistPlannerStateIfEnabled()
     }
@@ -111,9 +108,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
         persistPlannerStateIfEnabled()
     }
 
-    fun toggleMealSelection(mealId: String) {
-        _selectedMealIds.update { selected ->
-            if (mealId in selected) selected - mealId else selected + mealId
     fun assignMealToSlot(day: PlanDay, slot: MealSlot, mealId: String?) {
         _weeklyPlan.update { current ->
             val key = day to slot
@@ -123,7 +117,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun clearShoppingSelection() {
-        _selectedMealIds.value = emptySet()
         _weeklyPlan.value = emptyMap()
         persistPlannerStateIfEnabled()
     }
@@ -146,9 +139,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun getAggregatedShoppingList(): List<Ingredient> {
-        val selectedMeals = meals.value.filter { it.id in selectedMealIds.value }
-        val grouped = selectedMeals
-            .flatMap { it.ingredients }
         val mealMap = meals.value.associateBy { it.id }
         val plannedIngredients = weeklyPlan.value.mapNotNull { (_, mealId) ->
             val meal = mealMap[mealId] ?: return@mapNotNull null
@@ -247,7 +237,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
         _purchasedIngredientKeys.value = state.purchasedIngredientKeys.toSet()
         _dayCount.value = state.dayMultiplier
         val mealIds = state.meals.map { it.id }.toSet()
-        _selectedMealIds.update { it.intersect(mealIds) }
         _weeklyPlan.value = state.weeklyPlan
             .filter { it.mealId in mealIds }
             .associate { (it.day to it.slot) to it.mealId }
@@ -256,7 +245,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
     private fun clearPlannerData() {
         _meals.value = emptyList()
         _groups.value = MealsRepository.DEFAULT_GROUPS
-        _selectedMealIds.value = emptySet()
         _weeklyPlan.value = emptyMap()
         _purchasedIngredientKeys.value = emptySet()
         _dayCount.value = 1
@@ -273,7 +261,6 @@ class MealPlannerViewModel(application: Application) : AndroidViewModel(applicat
             PlannerState(
                 meals = meals.value,
                 groups = groups.value,
-                purchasedIngredientKeys = purchasedIngredientKeys.value.toList()
                 purchasedIngredientKeys = purchasedIngredientKeys.value.toList(),
                 weeklyPlan = weeklyPlan.value.map { (key, mealId) ->
                     WeeklyPlanAssignment(day = key.first, slot = key.second, mealId = mealId)
