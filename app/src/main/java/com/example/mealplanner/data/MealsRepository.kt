@@ -11,13 +11,16 @@ import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import java.util.UUID
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 class MealsRepository(context: Context) {
 
     private val dao = MealPlannerDatabase.getInstance(context).plannerStateDao()
     private val sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    fun saveState(state: PlannerState) {
+    suspend fun saveState(state: PlannerState) = withContext(Dispatchers.IO) {
         val entity = PlannerStateEntity(
             mealsJson = gson.toJson(state.meals),
             groupsJson = gson.toJson(state.groups),
@@ -28,9 +31,9 @@ class MealsRepository(context: Context) {
         dao.upsert(entity)
     }
 
-    fun loadState(): PlannerState {
+    suspend fun loadState(): PlannerState = withContext(Dispatchers.IO) {
         dao.getById()?.let { entity ->
-            return PlannerState(
+            return@withContext PlannerState(
                 meals = gson.fromJson(entity.mealsJson, object : TypeToken<List<Meal>>() {}.type) ?: emptyList(),
                 groups = normalizeGroups(
                     gson.fromJson(entity.groupsJson, object : TypeToken<List<String>>() {}.type)
@@ -44,10 +47,10 @@ class MealsRepository(context: Context) {
             )
         }
 
-        return migrateFromLegacySharedPreferences()
+        return@withContext migrateFromLegacySharedPreferences()
     }
 
-    private fun migrateFromLegacySharedPreferences(): PlannerState {
+    private suspend fun migrateFromLegacySharedPreferences(): PlannerState {
         val serialized = sharedPreferences.getString(KEY_STATE, null)
             ?: return PlannerState(groups = DEFAULT_GROUPS)
 

@@ -8,8 +8,8 @@ import androidx.room.Query
 @Dao
 interface PlannerStateDao {
     @Query("SELECT * FROM planner_state WHERE id = :id")
-    fun getById(id: Int = PlannerStateEntity.SINGLETON_ID): PlannerStateEntity?
+    suspend fun getById(id: Int = PlannerStateEntity.SINGLETON_ID): PlannerStateEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsert(entity: PlannerStateEntity)
+    suspend fun upsert(entity: PlannerStateEntity)
 }
