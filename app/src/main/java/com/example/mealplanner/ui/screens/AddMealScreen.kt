@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,8 +59,8 @@ fun AddMealScreen(
     onIngredientUnitChange: (String) -> Unit,
     onIngredientQuantityChange: (String) -> Unit,
     onConfirmIngredient: () -> Unit,
-    onEditDraftIngredient: (Int) -> Unit,
-    onRemoveDraftIngredient: (Int) -> Unit,
+    onEditDraftIngredient: (String) -> Unit,
+    onRemoveDraftIngredient: (String) -> Unit,
     onSaveMeal: () -> Unit
 ) {
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -175,10 +174,10 @@ fun AddMealScreen(
                             .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        itemsIndexed(
-                            state.selectedIngredients,
-                            key = { _, item -> "${item.name}_${item.unit}" }
-                        ) { index, item ->
+                        items(
+                            items = state.selectedIngredients,
+                            key = { item -> item.id }
+                        ) { item ->
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier
@@ -192,10 +191,10 @@ fun AddMealScreen(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(text = "${item.quantityInput} ${item.unit}")
                                     }
-                                    IconButton(onClick = { onEditDraftIngredient(index) }) {
+                                    IconButton(onClick = { onEditDraftIngredient(item.id) }) {
                                         Text("✏️")
                                     }
-                                    IconButton(onClick = { onRemoveDraftIngredient(index) }) {
+                                    IconButton(onClick = { onRemoveDraftIngredient(item.id) }) {
                                         Text("🗑️")
                                     }
                                 }
