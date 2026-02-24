@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -35,20 +36,19 @@ fun AddMealScreen(
     onBack: () -> Unit,
     onMealNameChange: (String) -> Unit,
     onGroupSelect: (String) -> Unit,
-    onIngredientQueryChange: (String) -> Unit,
-    onIngredientSelect: (String, String) -> Unit,
-    onIngredientUnitChange: (String) -> Unit,
-    onIngredientQuantityChange: (String) -> Unit,
-    onAddIngredientClick: () -> Unit,
+    onAddIngredientClick: (String, String, String) -> Boolean,
     onDraftQuantityChange: (Int, String) -> Unit,
     onRemoveDraftIngredient: (Int) -> Unit,
     onSaveMeal: () -> Unit
 ) {
-    var groupMenuExpanded by remember { mutableStateOf(false) }
-    var ingredientMenuExpanded by remember { mutableStateOf(false) }
+    var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var ingredientMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var ingredientQuery by rememberSaveable { mutableStateOf("") }
+    var ingredientUnitInput by rememberSaveable { mutableStateOf("") }
+    var ingredientQuantityInput by rememberSaveable { mutableStateOf("") }
 
-    val filteredIngredients = remember(ingredientCatalog, state.ingredientQuery) {
-        val query = state.ingredientQuery.trim()
+    val filteredIngredients = remember(ingredientCatalog, ingredientQuery) {
+        val query = ingredientQuery.trim()
         if (query.isBlank()) {
             ingredientCatalog.take(20)
         } else {
@@ -112,9 +112,9 @@ fun AddMealScreen(
             onExpandedChange = { ingredientMenuExpanded = !ingredientMenuExpanded }
         ) {
             OutlinedTextField(
-                value = state.ingredientQuery,
+                value = ingredientQuery,
                 onValueChange = {
-                    onIngredientQueryChange(it)
+                    ingredientQuery = it
                     ingredientMenuExpanded = true
                 },
                 label = { Text("Ингредиент") },
@@ -134,7 +134,8 @@ fun AddMealScreen(
                     DropdownMenuItem(
                         text = { Text("${ingredient.name} (${ingredient.unit})") },
                         onClick = {
-                            onIngredientSelect(ingredient.name, ingredient.unit)
+                            ingredientQuery = ingredient.name
+                            ingredientUnitInput = ingredient.unit
                             ingredientMenuExpanded = false
                         }
                     )
@@ -148,20 +149,28 @@ fun AddMealScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
-                value = state.ingredientQuantityInput,
-                onValueChange = onIngredientQuantityChange,
+                value = ingredientQuantityInput,
+                onValueChange = { ingredientQuantityInput = it },
                 label = { Text("Количество") },
                 modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
-                value = state.ingredientUnitInput,
-                onValueChange = onIngredientUnitChange,
+                value = ingredientUnitInput,
+                onValueChange = { ingredientUnitInput = it },
                 label = { Text("Единица") },
                 modifier = Modifier.weight(1f)
             )
         }
 
-        Button(onClick = onAddIngredientClick) {
+        Button(onClick = {
+            val added = onAddIngredientClick(ingredientQuery, ingredientUnitInput, ingredientQuantityInput)
+            if (added) {
+                ingredientQuery = ""
+                ingredientUnitInput = ""
+                ingredientQuantityInput = ""
+                ingredientMenuExpanded = false
+            }
+        }) {
             Text("Добавить ингредиент")
         }
 

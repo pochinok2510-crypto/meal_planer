@@ -41,9 +41,6 @@ data class MealIngredientDraft(
 data class AddMealUiState(
     val mealName: String = "",
     val selectedGroup: String = "",
-    val ingredientQuery: String = "",
-    val ingredientUnitInput: String = "",
-    val ingredientQuantityInput: String = "",
     val selectedIngredients: List<MealIngredientDraft> = emptyList(),
     val error: String? = null
 )
@@ -82,9 +79,6 @@ class MealPlannerViewModel(
         AddMealUiState(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
             selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
-            ingredientQuery = savedStateHandle[KEY_INGREDIENT_QUERY] ?: "",
-            ingredientUnitInput = savedStateHandle[KEY_INGREDIENT_UNIT] ?: "",
-            ingredientQuantityInput = savedStateHandle[KEY_INGREDIENT_QUANTITY] ?: "",
             selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
             error = savedStateHandle[KEY_ADD_MEAL_ERROR]
         )
@@ -207,46 +201,25 @@ class MealPlannerViewModel(
         updateAddMealState { it.copy(selectedGroup = value, error = null) }
     }
 
-    fun updateIngredientQuery(value: String) {
-        val existing = ingredientCatalog.value.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) }
-        updateAddMealState {
-            it.copy(
-                ingredientQuery = value,
-                ingredientUnitInput = existing?.unit ?: it.ingredientUnitInput,
-                error = null
-            )
-        }
-    }
-
-    fun updateIngredientUnitInput(value: String) {
-        updateAddMealState { it.copy(ingredientUnitInput = value, error = null) }
-    }
-
-    fun updateIngredientQuantityInput(value: String) {
-        updateAddMealState { it.copy(ingredientQuantityInput = value, error = null) }
-    }
-
-    fun selectIngredientFromCatalog(name: String, unit: String) {
-        updateAddMealState {
-            it.copy(
-                ingredientQuery = name,
-                ingredientUnitInput = unit,
-                error = null
-            )
-        }
-    }
-
-    fun addIngredientToMealDraft() {
-        val state = _addMealUiState.value
-        val normalizedName = state.ingredientQuery.trim()
-        val quantity = state.ingredientQuantityInput.trim().toDoubleOrNull()
+    fun addIngredientToMealDraft(nameInput: String, unitInput: String, quantityInput: String): Boolean {
+        val normalizedName = nameInput.trim()
+        val quantity = quantityInput.trim().toDoubleOrNull()
         val existingIngredient = ingredientCatalog.value.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
-        val normalizedUnit = (existingIngredient?.unit ?: state.ingredientUnitInput).trim()
+        val normalizedUnit = (existingIngredient?.unit ?: unitInput).trim()
 
         when {
-            normalizedName.isBlank() -> updateAddMealState { it.copy(error = "Выберите ингредиент") }
-            quantity == null || quantity <= 0 -> updateAddMealState { it.copy(error = "Количество должно быть числом больше 0") }
-            normalizedUnit.isBlank() -> updateAddMealState { it.copy(error = "Введите единицу измерения") }
+            normalizedName.isBlank() -> {
+                updateAddMealState { it.copy(error = "Выберите ингредиент") }
+                return false
+            }
+            quantity == null || quantity <= 0 -> {
+                updateAddMealState { it.copy(error = "Количество должно быть числом больше 0") }
+                return false
+            }
+            normalizedUnit.isBlank() -> {
+                updateAddMealState { it.copy(error = "Введите единицу измерения") }
+                return false
+            }
             else -> {
                 if (existingIngredient == null) {
                     viewModelScope.launch {
@@ -263,7 +236,7 @@ class MealPlannerViewModel(
                     val newDraft = MealIngredientDraft(
                         name = normalizedName,
                         unit = normalizedUnit,
-                        quantityInput = state.ingredientQuantityInput.trim()
+                        quantityInput = quantityInput.trim()
                     )
 
                     val existingIndex = current.selectedIngredients.indexOfFirst {
@@ -277,12 +250,10 @@ class MealPlannerViewModel(
 
                     current.copy(
                         selectedIngredients = updated,
-                        ingredientQuery = "",
-                        ingredientUnitInput = "",
-                        ingredientQuantityInput = "",
                         error = null
                     )
                 }
+                return true
             }
         }
     }
@@ -593,9 +564,6 @@ class MealPlannerViewModel(
             val next = transform(current)
             savedStateHandle[KEY_MEAL_NAME] = next.mealName
             savedStateHandle[KEY_SELECTED_GROUP] = next.selectedGroup
-            savedStateHandle[KEY_INGREDIENT_QUERY] = next.ingredientQuery
-            savedStateHandle[KEY_INGREDIENT_UNIT] = next.ingredientUnitInput
-            savedStateHandle[KEY_INGREDIENT_QUANTITY] = next.ingredientQuantityInput
             savedStateHandle[KEY_SELECTED_INGREDIENTS] = encodeDraftIngredients(next.selectedIngredients)
             savedStateHandle[KEY_ADD_MEAL_ERROR] = next.error
             next
@@ -634,9 +602,6 @@ class MealPlannerViewModel(
     companion object {
         private const val KEY_MEAL_NAME = "add_meal_name"
         private const val KEY_SELECTED_GROUP = "add_meal_group"
-        private const val KEY_INGREDIENT_QUERY = "add_meal_ingredient_query"
-        private const val KEY_INGREDIENT_UNIT = "add_meal_ingredient_unit"
-        private const val KEY_INGREDIENT_QUANTITY = "add_meal_ingredient_quantity"
         private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
         private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
     }
