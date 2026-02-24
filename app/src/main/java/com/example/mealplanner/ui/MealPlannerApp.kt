@@ -46,7 +46,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val dayCount by viewModel.dayCount.collectAsState()
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
     val addMealState by viewModel.addMealUiState.collectAsState()
-    val ingredientCatalog by viewModel.ingredientCatalog.collectAsState()
+    val filteredIngredientCatalog by viewModel.filteredIngredientCatalog.collectAsState()
 
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
@@ -129,13 +129,18 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 }
                 AddMealScreen(
                     groups = groups,
-                    ingredientCatalog = ingredientCatalog,
+                    filteredIngredients = filteredIngredientCatalog,
                     state = addMealState,
                     onBack = { navController.popBackStack() },
                     onMealNameChange = viewModel::updateAddMealName,
                     onGroupSelect = viewModel::updateAddMealGroup,
-                    onAddIngredientClick = viewModel::addIngredientToMealDraft,
-                    onDraftQuantityChange = viewModel::updateDraftIngredientQuantity,
+                    onOpenIngredientSheet = viewModel::openIngredientSheet,
+                    onCloseIngredientSheet = viewModel::closeIngredientSheet,
+                    onIngredientSearchChange = viewModel::updateIngredientSearchQuery,
+                    onIngredientSelect = viewModel::selectIngredientFromCatalog,
+                    onIngredientUnitChange = viewModel::updateIngredientUnitInput,
+                    onIngredientQuantityChange = viewModel::updateIngredientQuantityInput,
+                    onConfirmIngredient = { viewModel.confirmIngredientFromSheet() },
                     onRemoveDraftIngredient = viewModel::removeDraftIngredient,
                     onSaveMeal = {
                         viewModel.saveMealFromDraft {
