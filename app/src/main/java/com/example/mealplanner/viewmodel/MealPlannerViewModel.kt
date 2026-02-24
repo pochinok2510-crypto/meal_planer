@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -32,9 +33,11 @@ import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.roundToInt
 
 data class MealIngredientDraft(
+    val id: String = UUID.randomUUID().toString(),
     val name: String,
     val unit: String,
     val quantityInput: String
@@ -108,8 +111,12 @@ class MealPlannerViewModel(
     )
     val addMealUiState: StateFlow<AddMealUiState> = _addMealUiState.asStateFlow()
 
-    val filteredIngredientCatalog = combine(ingredientCatalog, _addMealUiState) { catalog, state ->
-        val query = state.ingredientSearchQuery.trim()
+    private val ingredientSearchQuery = _addMealUiState
+        .map { it.ingredientSearchQuery }
+        .distinctUntilChanged()
+
+    val filteredIngredientCatalog = combine(ingredientCatalog, ingredientSearchQuery) { catalog, searchQuery ->
+        val query = searchQuery.trim()
         if (query.isBlank()) {
             catalog.take(40)
         } else {
@@ -364,7 +371,10 @@ class MealPlannerViewModel(
                         it.name.equals(normalizedName, ignoreCase = true) && it.unit.equals(normalizedUnit, ignoreCase = true)
                     }
                     val updated = if (existingIndex >= 0) {
-                        current.selectedIngredients.toMutableList().apply { set(existingIndex, newDraft) }
+                        current.selectedIngredients.toMutableList().apply {
+                            val existingId = current.selectedIngredients[existingIndex].id
+                            set(existingIndex, newDraft.copy(id = existingId))
+                        }
                     } else {
                         current.selectedIngredients + newDraft
                     }
@@ -379,16 +389,17 @@ class MealPlannerViewModel(
         }
     }
 
-    fun removeDraftIngredient(index: Int) {
+    fun removeDraftIngredient(draftId: String) {
         updateAddMealState { state ->
-            if (index !in state.selectedIngredients.indices) return@updateAddMealState state
-            state.copy(selectedIngredients = state.selectedIngredients.filterIndexed { i, _ -> i != index }, error = null)
+            val updated = state.selectedIngredients.filterNot { it.id == draftId }
+            if (updated.size == state.selectedIngredients.size) return@updateAddMealState state
+            state.copy(selectedIngredients = updated, error = null)
         }
     }
 
-    fun editDraftIngredient(index: Int) {
+    fun editDraftIngredient(draftId: String) {
         updateAddMealState { state ->
-            val draft = state.selectedIngredients.getOrNull(index) ?: return@updateAddMealState state
+            val draft = state.selectedIngredients.firstOrNull { it.id == draftId } ?: return@updateAddMealState state
             state.copy(
                 isIngredientSheetVisible = true,
                 ingredientSearchQuery = draft.name,
@@ -705,6 +716,7 @@ class MealPlannerViewModel(
                     put("name", item.name)
                     put("unit", item.unit)
                     put("quantityInput", item.quantityInput)
+                    put("id", item.id)
                 }
             )
         }
@@ -718,6 +730,7 @@ class MealPlannerViewModel(
             List(jsonArray.length()) { index ->
                 val obj = jsonArray.getJSONObject(index)
                 MealIngredientDraft(
+                    id = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
                     name = obj.optString("name"),
                     unit = obj.optString("unit"),
                     quantityInput = obj.optString("quantityInput")
