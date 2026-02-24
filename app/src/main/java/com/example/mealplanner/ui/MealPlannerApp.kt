@@ -47,6 +47,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
     val addMealState by viewModel.addMealUiState.collectAsState()
     val filteredIngredientCatalog by viewModel.filteredIngredientCatalog.collectAsState()
+    val groupedFilteredIngredientCatalog by viewModel.groupedFilteredIngredientCatalog.collectAsState()
 
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
@@ -130,6 +131,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 AddMealScreen(
                     groups = groups,
                     filteredIngredients = filteredIngredientCatalog,
+                    groupedFilteredIngredients = groupedFilteredIngredientCatalog,
                     state = addMealState,
                     onBack = { navController.popBackStack() },
                     onMealNameChange = viewModel::updateAddMealName,

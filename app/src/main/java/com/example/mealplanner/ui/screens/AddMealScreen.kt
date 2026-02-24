@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
@@ -33,11 +34,14 @@ import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.local.Ingredient
 import com.example.mealplanner.viewmodel.AddMealUiState
 
+private const val INGREDIENT_OTHER_CATEGORY = "Other"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMealScreen(
     groups: List<String>,
     filteredIngredients: List<Ingredient>,
+    groupedFilteredIngredients: Map<String, List<Ingredient>>,
     state: AddMealUiState,
     onBack: () -> Unit,
     onMealNameChange: (String) -> Unit,
@@ -162,6 +166,7 @@ fun AddMealScreen(
         IngredientSheet(
             state = state,
             filteredIngredients = filteredIngredients,
+            groupedFilteredIngredients = groupedFilteredIngredients,
             onDismiss = onCloseIngredientSheet,
             onIngredientSearchChange = onIngredientSearchChange,
             onIngredientSelect = onIngredientSelect,
@@ -177,6 +182,7 @@ fun AddMealScreen(
 private fun IngredientSheet(
     state: AddMealUiState,
     filteredIngredients: List<Ingredient>,
+    groupedFilteredIngredients: Map<String, List<Ingredient>>,
     onDismiss: () -> Unit,
     onIngredientSearchChange: (String) -> Unit,
     onIngredientSelect: (String, String) -> Unit,
@@ -215,14 +221,22 @@ private fun IngredientSheet(
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                itemsIndexed(filteredIngredients, key = { _, item -> item.id }) { _, ingredient ->
-                    Text(
-                        text = "${ingredient.name} (${ingredient.unit})",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onIngredientSelect(ingredient.name, ingredient.unit) }
-                            .padding(8.dp)
-                    )
+                groupedFilteredIngredients.forEach { (category, ingredients) ->
+                    item(key = "header_$category") {
+                        Text(
+                            text = category.ifBlank { INGREDIENT_OTHER_CATEGORY },
+                            modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp)
+                        )
+                    }
+                    items(items = ingredients, key = { item -> item.id }) { ingredient ->
+                        Text(
+                            text = "${ingredient.name} (${ingredient.unit})",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onIngredientSelect(ingredient.name, ingredient.unit) }
+                                .padding(8.dp)
+                        )
+                    }
                 }
             }
 

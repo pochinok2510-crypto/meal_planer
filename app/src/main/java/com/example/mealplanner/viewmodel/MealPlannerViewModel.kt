@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -102,6 +103,27 @@ class MealPlannerViewModel(
             catalog.filter { ingredient -> ingredient.name.contains(query, ignoreCase = true) }.take(40)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val groupedFilteredIngredientCatalog = filteredIngredientCatalog
+        .map { catalog ->
+            val grouped = catalog.groupBy { ingredient ->
+                ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY
+            }
+
+            val orderedCategories = grouped.keys
+                .filterNot { it == OTHER_INGREDIENT_CATEGORY }
+                .sorted()
+
+            buildMap {
+                orderedCategories.forEach { category ->
+                    put(category, grouped.getValue(category))
+                }
+                grouped[OTHER_INGREDIENT_CATEGORY]?.let { otherIngredients ->
+                    put(OTHER_INGREDIENT_CATEGORY, otherIngredients)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     init {
         observeMeals()
@@ -686,6 +708,8 @@ class MealPlannerViewModel(
     }
 
     companion object {
+        private const val OTHER_INGREDIENT_CATEGORY = "Other"
+
         private const val KEY_MEAL_NAME = "add_meal_name"
         private const val KEY_SELECTED_GROUP = "add_meal_group"
         private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
