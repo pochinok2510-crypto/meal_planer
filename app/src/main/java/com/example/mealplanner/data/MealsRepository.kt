@@ -1,6 +1,7 @@
 package com.example.mealplanner.data
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.example.mealplanner.data.local.IngredientDao
 import com.example.mealplanner.data.local.MealIngredientCrossRef
@@ -96,7 +97,11 @@ class MealsRepository(context: Context) {
     suspend fun loadState(): PlannerState = withContext(Dispatchers.IO) {
         val dbMeals = getMealsSnapshot()
         plannerStateDao.getById()?.let { entity ->
-            val mealsFromEntity = gson.fromJson(entity.mealsJson, object : TypeToken<List<Meal>>() {}.type) ?: emptyList()
+            val mealsFromEntity: List<Meal> = gson.fromJson(
+                entity.mealsJson,
+                object : TypeToken<List<Meal>>() {}.type
+            ) ?: emptyList()
+
             val effectiveMeals = if (dbMeals.isEmpty() && mealsFromEntity.isNotEmpty()) {
                 migrateLegacyMealsToDatabase(mealsFromEntity).also {
                     plannerStateDao.upsert(entity.copy(mealsJson = "[]"))
@@ -108,13 +113,21 @@ class MealsRepository(context: Context) {
             return@withContext PlannerState(
                 meals = effectiveMeals,
                 groups = normalizeGroups(
-                    gson.fromJson(entity.groupsJson, object : TypeToken<List<String>>() {}.type)
-                        ?: DEFAULT_GROUPS
+                    (gson.fromJson<List<String>>(
+                        entity.groupsJson,
+                        object : TypeToken<List<String>>() {}.type
+                    ) ?: DEFAULT_GROUPS)
                 ),
-                purchasedIngredientKeys = (gson.fromJson(entity.purchasedIngredientKeysJson, object : TypeToken<List<String>>() {}.type)
-                    ?: emptyList<String>()).distinct(),
-                weeklyPlan = gson.fromJson(entity.weeklyPlanJson, object : TypeToken<List<WeeklyPlanAssignment>>() {}.type)
-                    ?: emptyList<WeeklyPlanAssignment>(),
+                purchasedIngredientKeys = (
+                    gson.fromJson<List<String>>(
+                        entity.purchasedIngredientKeysJson,
+                        object : TypeToken<List<String>>() {}.type
+                    ) ?: emptyList()
+                ).distinct(),
+                weeklyPlan = gson.fromJson<List<WeeklyPlanAssignment>>(
+                    entity.weeklyPlanJson,
+                    object : TypeToken<List<WeeklyPlanAssignment>>() {}.type
+                ) ?: emptyList(),
                 dayMultiplier = entity.dayCount.coerceIn(1, 30)
             )
         }
@@ -145,7 +158,10 @@ class MealsRepository(context: Context) {
                 )
             } else {
                 val type = object : TypeToken<LegacyPlannerState>() {}.type
-                val state: LegacyPlannerState = gson.fromJson(serialized, type)
+
+                val state: LegacyPlannerState = gson.fromJson<LegacyPlannerState>(serialized, type)
+                    ?: LegacyPlannerState()
+
                 val migratedMeals = migrateLegacyMealsToDatabase(state.meals)
                 val idMap = migratedMeals.mapNotNull { migratedMeal ->
                     state.meals.firstOrNull { it.name == migratedMeal.name && it.group == migratedMeal.group }?.id?.let { oldId ->
@@ -168,7 +184,7 @@ class MealsRepository(context: Context) {
         }
 
         saveState(migrated)
-        sharedPreferences.edit().remove(KEY_STATE).apply()
+        sharedPreferences.edit { remove(KEY_STATE) }
         return migrated
     }
 
