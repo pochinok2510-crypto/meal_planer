@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -377,23 +379,52 @@ class MealPlannerViewModel(
 
     fun getAggregatedShoppingList(): List<Ingredient> {
         val mealMap = meals.value.associateBy { it.id }
-        val plannedIngredients = weeklyPlan.value.mapNotNull { (_, mealId) ->
-            val meal = mealMap[mealId] ?: return@mapNotNull null
-            meal.ingredients
-        }.flatten()
+        val ingredientIdByKey = ingredientCatalog.value.associateBy(
+            keySelector = { ingredient -> ingredient.name.normalizedKey() to ingredient.unit.normalizedKey() },
+            valueTransform = { ingredient -> ingredient.id }
+        )
 
-        val grouped = plannedIngredients
-            .groupBy { ingredient -> ingredient.name.trim().lowercase() to ingredient.unit.trim().lowercase() }
+        val multiplier = BigDecimal.valueOf(dayCount.value.toLong())
 
-        val multiplier = dayCount.value
+        val grouped = weeklyPlan.value.values
+            .mapNotNull { mealId -> mealMap[mealId] }
+            .flatMap { meal ->
+                meal.ingredients.map { ingredient ->
+                    val normalizedName = ingredient.name.normalizedKey()
+                    val normalizedUnit = ingredient.unit.normalizedKey()
+                    val ingredientId = ingredientIdByKey[normalizedName to normalizedUnit]
+                        ?: syntheticIngredientId(normalizedName, normalizedUnit)
+                    ShoppingIngredientItem(
+                        ingredientId = ingredientId,
+                        displayName = ingredient.name.trim(),
+                        normalizedName = normalizedName,
+                        displayUnit = ingredient.unit.trim(),
+                        normalizedUnit = normalizedUnit,
+                        amount = BigDecimal.valueOf(ingredient.amount)
+                    )
+                }
+            }
+            .groupBy { item -> item.ingredientId }
 
-        return grouped.map { (key, items) ->
-            Ingredient(
-                name = key.first.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
-                amount = ((items.sumOf { it.amount } * multiplier) * 100.0).roundToInt() / 100.0,
-                unit = key.second
-            )
-        }.sortedBy { it.name }
+        return grouped.values
+            .mapNotNull { items ->
+                val first = items.firstOrNull() ?: return@mapNotNull null
+                val totalAmount = items
+                    .fold(BigDecimal.ZERO) { acc, item -> acc + item.amount }
+                    .multiply(multiplier)
+                    .setScale(2, RoundingMode.HALF_UP)
+
+                Ingredient(
+                    name = first.displayName.ifBlank {
+                        first.normalizedName.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase() else it.toString()
+                        }
+                    },
+                    amount = totalAmount.toDouble(),
+                    unit = first.displayUnit.ifBlank { first.normalizedUnit }
+                )
+            }
+            .sortedBy { it.name }
     }
 
     fun buildShoppingListMessage(): String {
@@ -519,6 +550,23 @@ class MealPlannerViewModel(
         document.finishPage(page)
         document.writeTo(output)
         document.close()
+    }
+
+    private data class ShoppingIngredientItem(
+        val ingredientId: Long,
+        val displayName: String,
+        val normalizedName: String,
+        val displayUnit: String,
+        val normalizedUnit: String,
+        val amount: BigDecimal
+    )
+
+    private fun String.normalizedKey(): String {
+        return trim().lowercase(Locale.getDefault())
+    }
+
+    private fun syntheticIngredientId(name: String, unit: String): Long {
+        return ("$name|$unit").hashCode().toLong()
     }
 
     private fun Ingredient.storageKey(): String {
