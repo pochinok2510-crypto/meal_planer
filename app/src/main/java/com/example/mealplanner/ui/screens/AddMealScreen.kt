@@ -35,6 +35,7 @@ import com.example.mealplanner.data.local.Ingredient
 import com.example.mealplanner.viewmodel.AddMealUiState
 
 private const val INGREDIENT_OTHER_CATEGORY = "Other"
+private val SUPPORTED_UNITS = listOf("g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "pack")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -191,13 +192,7 @@ private fun IngredientSheet(
     onConfirm: () -> Unit
 ) {
     var unitExpanded by remember { mutableStateOf(false) }
-    val unitOptions = remember(filteredIngredients, state.ingredientUnitInput) {
-        (filteredIngredients.map { it.unit } + state.ingredientUnitInput + listOf("г", "кг", "мл", "л", "шт"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .take(12)
-    }
+    val selectedUnit = state.ingredientUnitInput.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -233,7 +228,10 @@ private fun IngredientSheet(
                             text = "${ingredient.name} (${ingredient.unit})",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onIngredientSelect(ingredient.name, ingredient.unit) }
+                                .clickable {
+                                    val preselectedUnit = ingredient.unit.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
+                                    onIngredientSelect(ingredient.name, preselectedUnit)
+                                }
                                 .padding(8.dp)
                         )
                     }
@@ -245,8 +243,9 @@ private fun IngredientSheet(
                 onExpandedChange = { unitExpanded = !unitExpanded }
             ) {
                 OutlinedTextField(
-                    value = state.ingredientUnitInput,
-                    onValueChange = onUnitChange,
+                    value = selectedUnit,
+                    onValueChange = {},
+                    readOnly = true,
                     label = { Text("Единица") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
                     modifier = Modifier
@@ -258,7 +257,7 @@ private fun IngredientSheet(
                     expanded = unitExpanded,
                     onDismissRequest = { unitExpanded = false }
                 ) {
-                    unitOptions.forEach { unit ->
+                    SUPPORTED_UNITS.forEach { unit ->
                         DropdownMenuItem(
                             text = { Text(unit) },
                             onClick = {
