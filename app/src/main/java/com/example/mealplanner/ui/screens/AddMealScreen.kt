@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
@@ -29,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -65,6 +67,9 @@ fun AddMealScreen(
 ) {
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var mealTypeMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    val selectedIngredientsListState = rememberSaveable(saver = lazyListStateSaver()) {
+        LazyListState()
+    }
     val tabs = listOf(AddMealStep.BASIC_INFO to "Шаг 1: Основное", AddMealStep.INGREDIENTS to "Шаг 2: Ингредиенты")
 
     Column(
@@ -172,6 +177,7 @@ fun AddMealScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
+                        state = selectedIngredientsListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
@@ -246,7 +252,11 @@ private fun IngredientSheet(
     onConfirm: () -> Unit
 ) {
     var unitExpanded by remember { mutableStateOf(false) }
-    val selectedUnit = state.ingredientUnitInput.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
+    val selectedUnit = state.ingredientUnitInput
+    val availableUnits = remember(selectedUnit) {
+        if (selectedUnit.isBlank() || SUPPORTED_UNITS.contains(selectedUnit)) SUPPORTED_UNITS
+        else listOf(selectedUnit) + SUPPORTED_UNITS
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -284,8 +294,7 @@ private fun IngredientSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    val preselectedUnit = ingredient.unit.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
-                                    onIngredientSelect(ingredient.name, preselectedUnit)
+                                    onIngredientSelect(ingredient.name, ingredient.unit)
                                 }
                                 .padding(8.dp)
                         )
@@ -312,7 +321,7 @@ private fun IngredientSheet(
                     expanded = unitExpanded,
                     onDismissRequest = { unitExpanded = false }
                 ) {
-                    SUPPORTED_UNITS.forEach { unit ->
+                    availableUnits.forEach { unit ->
                         DropdownMenuItem(
                             text = { Text(unit) },
                             onClick = {
@@ -336,4 +345,16 @@ private fun IngredientSheet(
             }
         }
     }
+}
+
+private fun lazyListStateSaver(): Saver<LazyListState, List<Int>> {
+    return Saver(
+        save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
+        restore = { restored ->
+            LazyListState(
+                firstVisibleItemIndex = restored.getOrElse(0) { 0 },
+                firstVisibleItemScrollOffset = restored.getOrElse(1) { 0 }
+            )
+        }
+    )
 }
