@@ -136,6 +136,8 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onBack = { navController.popBackStack() },
                     onMealNameChange = viewModel::updateAddMealName,
                     onGroupSelect = viewModel::updateAddMealGroup,
+                    onMealTypeSelect = viewModel::updateAddMealType,
+                    onStepChange = viewModel::updateAddMealStep,
                     onOpenIngredientSheet = viewModel::openIngredientSheet,
                     onCloseIngredientSheet = viewModel::closeIngredientSheet,
                     onIngredientSearchChange = viewModel::updateIngredientSearchQuery,
