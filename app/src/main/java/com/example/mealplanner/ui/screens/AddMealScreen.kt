@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
@@ -184,7 +185,11 @@ fun AddMealScreen(
                             items = state.selectedIngredients,
                             key = { item -> item.id }
                         ) { item ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateItemPlacement()
+                            ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
