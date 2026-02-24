@@ -20,6 +20,7 @@ import com.example.mealplanner.model.SettingsState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -42,6 +43,10 @@ data class AddMealUiState(
     val mealName: String = "",
     val selectedGroup: String = "",
     val selectedIngredients: List<MealIngredientDraft> = emptyList(),
+    val isIngredientSheetVisible: Boolean = false,
+    val ingredientSearchQuery: String = "",
+    val ingredientUnitInput: String = "",
+    val ingredientQuantityInput: String = "",
     val error: String? = null
 )
 
@@ -80,10 +85,23 @@ class MealPlannerViewModel(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
             selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
             selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
+            isIngredientSheetVisible = savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] ?: false,
+            ingredientSearchQuery = savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] ?: "",
+            ingredientUnitInput = savedStateHandle[KEY_INGREDIENT_UNIT_INPUT] ?: "",
+            ingredientQuantityInput = savedStateHandle[KEY_INGREDIENT_QUANTITY_INPUT] ?: "",
             error = savedStateHandle[KEY_ADD_MEAL_ERROR]
         )
     )
     val addMealUiState: StateFlow<AddMealUiState> = _addMealUiState.asStateFlow()
+
+    val filteredIngredientCatalog = combine(ingredientCatalog, _addMealUiState) { catalog, state ->
+        val query = state.ingredientSearchQuery.trim()
+        if (query.isBlank()) {
+            catalog.take(40)
+        } else {
+            catalog.filter { ingredient -> ingredient.name.contains(query, ignoreCase = true) }.take(40)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         observeMeals()
@@ -199,6 +217,57 @@ class MealPlannerViewModel(
 
     fun updateAddMealGroup(value: String) {
         updateAddMealState { it.copy(selectedGroup = value, error = null) }
+    }
+
+    fun openIngredientSheet() {
+        updateAddMealState { it.copy(isIngredientSheetVisible = true, error = null) }
+    }
+
+    fun closeIngredientSheet() {
+        updateAddMealState {
+            it.copy(
+                isIngredientSheetVisible = false,
+                ingredientSearchQuery = "",
+                ingredientUnitInput = "",
+                ingredientQuantityInput = "",
+                error = null
+            )
+        }
+    }
+
+    fun updateIngredientSearchQuery(value: String) {
+        updateAddMealState { it.copy(ingredientSearchQuery = value, error = null) }
+    }
+
+    fun selectIngredientFromCatalog(name: String, unit: String) {
+        updateAddMealState {
+            it.copy(
+                ingredientSearchQuery = name,
+                ingredientUnitInput = unit,
+                error = null
+            )
+        }
+    }
+
+    fun updateIngredientUnitInput(value: String) {
+        updateAddMealState { it.copy(ingredientUnitInput = value, error = null) }
+    }
+
+    fun updateIngredientQuantityInput(value: String) {
+        updateAddMealState { it.copy(ingredientQuantityInput = value, error = null) }
+    }
+
+    fun confirmIngredientFromSheet(): Boolean {
+        val state = _addMealUiState.value
+        val added = addIngredientToMealDraft(
+            nameInput = state.ingredientSearchQuery,
+            unitInput = state.ingredientUnitInput,
+            quantityInput = state.ingredientQuantityInput
+        )
+        if (added) {
+            closeIngredientSheet()
+        }
+        return added
     }
 
     fun addIngredientToMealDraft(nameInput: String, unitInput: String, quantityInput: String): Boolean {
@@ -565,6 +634,10 @@ class MealPlannerViewModel(
             savedStateHandle[KEY_MEAL_NAME] = next.mealName
             savedStateHandle[KEY_SELECTED_GROUP] = next.selectedGroup
             savedStateHandle[KEY_SELECTED_INGREDIENTS] = encodeDraftIngredients(next.selectedIngredients)
+            savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] = next.isIngredientSheetVisible
+            savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] = next.ingredientSearchQuery
+            savedStateHandle[KEY_INGREDIENT_UNIT_INPUT] = next.ingredientUnitInput
+            savedStateHandle[KEY_INGREDIENT_QUANTITY_INPUT] = next.ingredientQuantityInput
             savedStateHandle[KEY_ADD_MEAL_ERROR] = next.error
             next
         }
@@ -603,6 +676,10 @@ class MealPlannerViewModel(
         private const val KEY_MEAL_NAME = "add_meal_name"
         private const val KEY_SELECTED_GROUP = "add_meal_group"
         private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
+        private const val KEY_INGREDIENT_SHEET_VISIBLE = "add_meal_ingredient_sheet_visible"
+        private const val KEY_INGREDIENT_SEARCH_QUERY = "add_meal_ingredient_search_query"
+        private const val KEY_INGREDIENT_UNIT_INPUT = "add_meal_ingredient_unit_input"
+        private const val KEY_INGREDIENT_QUANTITY_INPUT = "add_meal_ingredient_quantity_input"
         private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
     }
 }
