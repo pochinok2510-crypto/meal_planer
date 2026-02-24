@@ -77,6 +77,7 @@ fun AddMealScreen(
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var mealTypeMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var removingIngredientIds by remember { mutableStateOf(setOf<String>()) }
+
     val selectedIngredientsListState = rememberSaveable(saver = lazyListStateSaver()) {
         LazyListState()
     }
@@ -194,6 +195,7 @@ fun AddMealScreen(
                             items = state.selectedIngredients,
                             key = { item -> item.id }
                         ) { item ->
+
                             val visibilityState = remember(item.id) {
                                 MutableTransitionState(false).apply { targetState = true }
                             }
@@ -232,6 +234,7 @@ fun AddMealScreen(
                                         ) {
                                             Text("🗑️")
                                         }
+
                                     }
                                 }
                             }
