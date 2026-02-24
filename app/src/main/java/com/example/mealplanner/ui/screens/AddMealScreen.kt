@@ -4,17 +4,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -45,6 +49,7 @@ fun AddMealScreen(
     onIngredientUnitChange: (String) -> Unit,
     onIngredientQuantityChange: (String) -> Unit,
     onConfirmIngredient: () -> Unit,
+    onEditDraftIngredient: (Int) -> Unit,
     onRemoveDraftIngredient: (Int) -> Unit,
     onSaveMeal: () -> Unit
 ) {
@@ -114,16 +119,27 @@ fun AddMealScreen(
                     state.selectedIngredients,
                     key = { _, item -> "${item.name}_${item.unit}" }
                 ) { index, item ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("${item.name} • ${item.quantityInput} ${item.unit}", modifier = Modifier.weight(1f))
-                        Button(onClick = { onRemoveDraftIngredient(index) }) {
-                            Text("Удалить")
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = item.name)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(text = "${item.quantityInput} ${item.unit}")
+                            }
+                            IconButton(onClick = { onEditDraftIngredient(index) }) {
+                                Text("✏️")
+                            }
+                            IconButton(onClick = { onRemoveDraftIngredient(index) }) {
+                                Text("🗑️")
+                            }
                         }
                     }
-                    HorizontalDivider()
                 }
             }
         }
