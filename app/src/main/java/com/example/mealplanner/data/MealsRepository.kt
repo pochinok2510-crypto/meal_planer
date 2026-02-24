@@ -101,6 +101,7 @@ class MealsRepository(context: Context) {
                 entity.mealsJson,
                 object : TypeToken<List<Meal>>() {}.type
             ) ?: emptyList()
+
             val effectiveMeals = if (dbMeals.isEmpty() && mealsFromEntity.isNotEmpty()) {
                 migrateLegacyMealsToDatabase(mealsFromEntity).also {
                     plannerStateDao.upsert(entity.copy(mealsJson = "[]"))
@@ -157,8 +158,10 @@ class MealsRepository(context: Context) {
                 )
             } else {
                 val type = object : TypeToken<LegacyPlannerState>() {}.type
+
                 val state: LegacyPlannerState = gson.fromJson<LegacyPlannerState>(serialized, type)
                     ?: LegacyPlannerState()
+
                 val migratedMeals = migrateLegacyMealsToDatabase(state.meals)
                 val idMap = migratedMeals.mapNotNull { migratedMeal ->
                     state.meals.firstOrNull { it.name == migratedMeal.name && it.group == migratedMeal.group }?.id?.let { oldId ->
