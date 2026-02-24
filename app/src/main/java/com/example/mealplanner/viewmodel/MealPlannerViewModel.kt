@@ -43,6 +43,8 @@ data class MealIngredientDraft(
 data class AddMealUiState(
     val mealName: String = "",
     val selectedGroup: String = "",
+    val mealType: String = "",
+    val selectedStep: AddMealStep = AddMealStep.BASIC_INFO,
     val selectedIngredients: List<MealIngredientDraft> = emptyList(),
     val isIngredientSheetVisible: Boolean = false,
     val ingredientSearchQuery: String = "",
@@ -50,6 +52,11 @@ data class AddMealUiState(
     val ingredientQuantityInput: String = "",
     val error: String? = null
 )
+
+enum class AddMealStep {
+    BASIC_INFO,
+    INGREDIENTS
+}
 
 class MealPlannerViewModel(
     application: Application,
@@ -85,6 +92,10 @@ class MealPlannerViewModel(
         AddMealUiState(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
             selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
+            mealType = savedStateHandle[KEY_MEAL_TYPE] ?: "",
+            selectedStep = savedStateHandle.get<String>(KEY_ADD_MEAL_STEP)
+                ?.let { rawStep -> runCatching { AddMealStep.valueOf(rawStep) }.getOrDefault(AddMealStep.BASIC_INFO) }
+                ?: AddMealStep.BASIC_INFO,
             selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
             isIngredientSheetVisible = savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] ?: false,
             ingredientSearchQuery = savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] ?: "",
@@ -241,6 +252,14 @@ class MealPlannerViewModel(
         updateAddMealState { it.copy(selectedGroup = value, error = null) }
     }
 
+    fun updateAddMealType(value: String) {
+        updateAddMealState { it.copy(mealType = value, error = null) }
+    }
+
+    fun updateAddMealStep(step: AddMealStep) {
+        updateAddMealState { it.copy(selectedStep = step, error = null) }
+    }
+
     fun openIngredientSheet() {
         updateAddMealState { it.copy(isIngredientSheetVisible = true, error = null) }
     }
@@ -358,15 +377,6 @@ class MealPlannerViewModel(
         }
     }
 
-    fun updateDraftIngredientQuantity(index: Int, quantityInput: String) {
-        updateAddMealState { state ->
-            if (index !in state.selectedIngredients.indices) return@updateAddMealState state
-            val updated = state.selectedIngredients.toMutableList()
-            updated[index] = updated[index].copy(quantityInput = quantityInput)
-            state.copy(selectedIngredients = updated, error = null)
-        }
-    }
-
     fun removeDraftIngredient(index: Int) {
         updateAddMealState { state ->
             if (index !in state.selectedIngredients.indices) return@updateAddMealState state
@@ -412,7 +422,7 @@ class MealPlannerViewModel(
     fun resetAddMealDraft(keepGroup: Boolean = false) {
         val selectedGroup = if (keepGroup) _addMealUiState.value.selectedGroup else ""
         updateAddMealState {
-            AddMealUiState(selectedGroup = selectedGroup)
+            AddMealUiState(selectedGroup = selectedGroup, selectedStep = AddMealStep.BASIC_INFO)
         }
     }
 
@@ -462,10 +472,6 @@ class MealPlannerViewModel(
             if (purchased) current + key else current - key
         }
         persistPlannerStateIfEnabled()
-    }
-
-    fun isIngredientPurchased(ingredient: Ingredient): Boolean {
-        return ingredient.storageKey() in purchasedIngredientKeys.value
     }
 
     fun getAggregatedShoppingList(): List<Ingredient> {
@@ -677,6 +683,8 @@ class MealPlannerViewModel(
             val next = transform(current)
             savedStateHandle[KEY_MEAL_NAME] = next.mealName
             savedStateHandle[KEY_SELECTED_GROUP] = next.selectedGroup
+            savedStateHandle[KEY_MEAL_TYPE] = next.mealType
+            savedStateHandle[KEY_ADD_MEAL_STEP] = next.selectedStep.name
             savedStateHandle[KEY_SELECTED_INGREDIENTS] = encodeDraftIngredients(next.selectedIngredients)
             savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] = next.isIngredientSheetVisible
             savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] = next.ingredientSearchQuery
@@ -721,6 +729,8 @@ class MealPlannerViewModel(
 
         private const val KEY_MEAL_NAME = "add_meal_name"
         private const val KEY_SELECTED_GROUP = "add_meal_group"
+        private const val KEY_MEAL_TYPE = "add_meal_type"
+        private const val KEY_ADD_MEAL_STEP = "add_meal_step"
         private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
         private const val KEY_INGREDIENT_SHEET_VISIBLE = "add_meal_ingredient_sheet_visible"
         private const val KEY_INGREDIENT_SEARCH_QUERY = "add_meal_ingredient_search_query"

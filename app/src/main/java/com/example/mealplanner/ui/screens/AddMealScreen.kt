@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,8 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,21 +35,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.local.Ingredient
+import com.example.mealplanner.viewmodel.AddMealStep
 import com.example.mealplanner.viewmodel.AddMealUiState
 
 private const val INGREDIENT_OTHER_CATEGORY = "Other"
 private val SUPPORTED_UNITS = listOf("g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "pack")
+private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Перекус")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMealScreen(
     groups: List<String>,
-    filteredIngredients: List<Ingredient>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
     state: AddMealUiState,
     onBack: () -> Unit,
     onMealNameChange: (String) -> Unit,
     onGroupSelect: (String) -> Unit,
+    onMealTypeSelect: (String) -> Unit,
+    onStepChange: (AddMealStep) -> Unit,
     onOpenIngredientSheet: () -> Unit,
     onCloseIngredientSheet: () -> Unit,
     onIngredientSearchChange: (String) -> Unit,
@@ -59,6 +65,8 @@ fun AddMealScreen(
     onSaveMeal: () -> Unit
 ) {
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var mealTypeMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    val tabs = listOf(AddMealStep.BASIC_INFO to "Шаг 1: Основное", AddMealStep.INGREDIENTS to "Шаг 2: Ингредиенты")
 
     Column(
         modifier = Modifier
@@ -67,81 +75,130 @@ fun AddMealScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
 
-        OutlinedTextField(
-            value = state.mealName,
-            onValueChange = onMealNameChange,
-            label = { Text("Название блюда") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        ExposedDropdownMenuBox(
-            expanded = groupMenuExpanded,
-            onExpandedChange = { groupMenuExpanded = !groupMenuExpanded }
-        ) {
-            OutlinedTextField(
-                value = state.selectedGroup,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Группа") },
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupMenuExpanded)
-                },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
-            )
-
-            androidx.compose.material3.DropdownMenu(
-                expanded = groupMenuExpanded,
-                onDismissRequest = { groupMenuExpanded = false }
-            ) {
-                groups.forEach { group ->
-                    DropdownMenuItem(
-                        text = { Text(group) },
-                        onClick = {
-                            onGroupSelect(group)
-                            groupMenuExpanded = false
-                        }
-                    )
-                }
+        TabRow(selectedTabIndex = tabs.indexOfFirst { it.first == state.selectedStep }) {
+            tabs.forEach { (step, title) ->
+                Tab(
+                    selected = state.selectedStep == step,
+                    onClick = { onStepChange(step) },
+                    text = { Text(title) }
+                )
             }
         }
 
-        Text("Ингредиенты")
+        when (state.selectedStep) {
+            AddMealStep.BASIC_INFO -> {
+                OutlinedTextField(
+                    value = state.mealName,
+                    onValueChange = onMealNameChange,
+                    label = { Text("Название блюда") },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-        Button(onClick = onOpenIngredientSheet, modifier = Modifier.fillMaxWidth()) {
-            Text("+ Добавить ингредиент")
-        }
+                ExposedDropdownMenuBox(
+                    expanded = groupMenuExpanded,
+                    onExpandedChange = { groupMenuExpanded = !groupMenuExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = state.selectedGroup,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Группа") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = groupMenuExpanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
 
-        if (state.selectedIngredients.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(
-                    state.selectedIngredients,
-                    key = { _, item -> "${item.name}_${item.unit}" }
-                ) { index, item ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = item.name)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = "${item.quantityInput} ${item.unit}")
-                            }
-                            IconButton(onClick = { onEditDraftIngredient(index) }) {
-                                Text("✏️")
-                            }
-                            IconButton(onClick = { onRemoveDraftIngredient(index) }) {
-                                Text("🗑️")
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = groupMenuExpanded,
+                        onDismissRequest = { groupMenuExpanded = false }
+                    ) {
+                        groups.forEach { group ->
+                            DropdownMenuItem(
+                                text = { Text(group) },
+                                onClick = {
+                                    onGroupSelect(group)
+                                    groupMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = mealTypeMenuExpanded,
+                    onExpandedChange = { mealTypeMenuExpanded = !mealTypeMenuExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = state.mealType,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Тип приема пищи") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = mealTypeMenuExpanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = mealTypeMenuExpanded,
+                        onDismissRequest = { mealTypeMenuExpanded = false }
+                    ) {
+                        MEAL_TYPES.forEach { mealType ->
+                            DropdownMenuItem(
+                                text = { Text(mealType) },
+                                onClick = {
+                                    onMealTypeSelect(mealType)
+                                    mealTypeMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            AddMealStep.INGREDIENTS -> {
+                Text("Ингредиенты")
+
+                Button(onClick = onOpenIngredientSheet, modifier = Modifier.fillMaxWidth()) {
+                    Text("+ Добавить ингредиент")
+                }
+
+                if (state.selectedIngredients.isNotEmpty()) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(
+                            state.selectedIngredients,
+                            key = { _, item -> "${item.name}_${item.unit}" }
+                        ) { index, item ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = item.name)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = "${item.quantityInput} ${item.unit}")
+                                    }
+                                    IconButton(onClick = { onEditDraftIngredient(index) }) {
+                                        Text("✏️")
+                                    }
+                                    IconButton(onClick = { onRemoveDraftIngredient(index) }) {
+                                        Text("🗑️")
+                                    }
+                                }
                             }
                         }
                     }
@@ -166,7 +223,6 @@ fun AddMealScreen(
     if (state.isIngredientSheetVisible) {
         IngredientSheet(
             state = state,
-            filteredIngredients = filteredIngredients,
             groupedFilteredIngredients = groupedFilteredIngredients,
             onDismiss = onCloseIngredientSheet,
             onIngredientSearchChange = onIngredientSearchChange,
@@ -182,7 +238,6 @@ fun AddMealScreen(
 @Composable
 private fun IngredientSheet(
     state: AddMealUiState,
-    filteredIngredients: List<Ingredient>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
     onDismiss: () -> Unit,
     onIngredientSearchChange: (String) -> Unit,
@@ -213,6 +268,7 @@ private fun IngredientSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 280.dp)
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
