@@ -343,6 +343,19 @@ class MealPlannerViewModel(
         }
     }
 
+    fun editDraftIngredient(index: Int) {
+        updateAddMealState { state ->
+            val draft = state.selectedIngredients.getOrNull(index) ?: return@updateAddMealState state
+            state.copy(
+                isIngredientSheetVisible = true,
+                ingredientSearchQuery = draft.name,
+                ingredientUnitInput = draft.unit,
+                ingredientQuantityInput = draft.quantityInput,
+                error = null
+            )
+        }
+    }
+
     fun saveMealFromDraft(onSuccess: () -> Unit) {
         val state = _addMealUiState.value
         when {

@@ -141,6 +141,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onIngredientUnitChange = viewModel::updateIngredientUnitInput,
                     onIngredientQuantityChange = viewModel::updateIngredientQuantityInput,
                     onConfirmIngredient = { viewModel.confirmIngredientFromSheet() },
+                    onEditDraftIngredient = viewModel::editDraftIngredient,
                     onRemoveDraftIngredient = viewModel::removeDraftIngredient,
                     onSaveMeal = {
                         viewModel.saveMealFromDraft {
