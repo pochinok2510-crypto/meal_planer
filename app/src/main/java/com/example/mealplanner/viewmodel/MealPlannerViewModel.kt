@@ -30,7 +30,6 @@ import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
-import java.util.UUID
 import kotlin.math.roundToInt
 
 data class MealIngredientDraft(
@@ -93,7 +92,18 @@ class MealPlannerViewModel(
     val addMealUiState: StateFlow<AddMealUiState> = _addMealUiState.asStateFlow()
 
     init {
+        observeMeals()
         observeSettings()
+    }
+
+    private fun observeMeals() {
+        viewModelScope.launch {
+            mealsRepository.observeMeals().collect { loadedMeals ->
+                if (settings.value.persistDataBetweenLaunches) {
+                    _meals.value = loadedMeals
+                }
+            }
+        }
     }
 
     private fun observeSettings() {
@@ -175,14 +185,10 @@ class MealPlannerViewModel(
         val normalizedGroup = group.trim()
         if (normalizedName.isBlank() || ingredients.isEmpty() || normalizedGroup.isBlank()) return
 
-        val meal = Meal(
-            id = UUID.randomUUID().toString(),
-            name = normalizedName,
-            group = normalizedGroup,
-            ingredients = ingredients
-        )
-        _meals.update { it + meal }
-        persistPlannerStateIfEnabled()
+        viewModelScope.launch {
+            mealsRepository.addMeal(normalizedName, normalizedGroup, ingredients)
+            persistPlannerStateIfEnabled()
+        }
     }
 
     fun onAddMealScreenVisible(availableGroups: List<String>) {
@@ -327,24 +333,25 @@ class MealPlannerViewModel(
     }
 
     fun removeMeal(meal: Meal) {
-        _meals.update { current -> current.filterNot { it.id == meal.id } }
         _weeklyPlan.update { current -> current.filterValues { it != meal.id } }
-        persistPlannerStateIfEnabled()
+        viewModelScope.launch {
+            mealsRepository.removeMeal(meal.id)
+            persistPlannerStateIfEnabled()
+        }
     }
 
     fun moveMealToGroup(meal: Meal, targetGroup: String) {
-        _meals.update { current ->
-            current.map {
-                if (it.id == meal.id) it.copy(group = targetGroup) else it
-            }
+        viewModelScope.launch {
+            mealsRepository.moveMealToGroup(meal.id, targetGroup)
+            persistPlannerStateIfEnabled()
         }
-        persistPlannerStateIfEnabled()
     }
 
     fun duplicateMealToGroup(meal: Meal, targetGroup: String) {
-        val duplicate = meal.copy(id = UUID.randomUUID().toString(), group = targetGroup)
-        _meals.update { it + duplicate }
-        persistPlannerStateIfEnabled()
+        viewModelScope.launch {
+            mealsRepository.duplicateMealToGroup(meal.id, targetGroup)
+            persistPlannerStateIfEnabled()
+        }
     }
 
     fun assignMealToSlot(day: PlanDay, slot: MealSlot, mealId: String?) {
