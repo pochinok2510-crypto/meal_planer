@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
@@ -14,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Meal::class,
         MealIngredientCrossRef::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class MealPlannerDatabase : RoomDatabase() {
@@ -116,6 +117,26 @@ abstract class MealPlannerDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn(tableName = "meals", columnName = "legacyIngredients")) {
+                    db.execSQL("ALTER TABLE meals ADD COLUMN legacyIngredients TEXT")
+                }
+            }
+        }
+
+        private fun SupportSQLiteDatabase.hasColumn(tableName: String, columnName: String): Boolean {
+            query(SimpleSQLiteQuery("PRAGMA table_info($tableName)")).use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameIndex >= 0 && cursor.getString(nameIndex) == columnName) {
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
         fun getInstance(context: Context): MealPlannerDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -123,7 +144,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     MealPlannerDatabase::class.java,
                     "meal_planner.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { INSTANCE = it }
             }
