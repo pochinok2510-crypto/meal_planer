@@ -46,7 +46,6 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val dayCount by viewModel.dayCount.collectAsState()
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
     val addMealState by viewModel.addMealUiState.collectAsState()
-    val filteredIngredientCatalog by viewModel.filteredIngredientCatalog.collectAsState()
     val groupedFilteredIngredientCatalog by viewModel.groupedFilteredIngredientCatalog.collectAsState()
 
     val savePdfLauncher = rememberLauncherForActivityResult(
@@ -130,7 +129,6 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 }
                 AddMealScreen(
                     groups = groups,
-                    filteredIngredients = filteredIngredientCatalog,
                     groupedFilteredIngredients = groupedFilteredIngredientCatalog,
                     state = addMealState,
                     onBack = { navController.popBackStack() },

@@ -46,7 +46,6 @@ private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Пе�
 @Composable
 fun AddMealScreen(
     groups: List<String>,
-    filteredIngredients: List<Ingredient>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
     state: AddMealUiState,
     onBack: () -> Unit,
@@ -224,7 +223,6 @@ fun AddMealScreen(
     if (state.isIngredientSheetVisible) {
         IngredientSheet(
             state = state,
-            filteredIngredients = filteredIngredients,
             groupedFilteredIngredients = groupedFilteredIngredients,
             onDismiss = onCloseIngredientSheet,
             onIngredientSearchChange = onIngredientSearchChange,
@@ -240,7 +238,6 @@ fun AddMealScreen(
 @Composable
 private fun IngredientSheet(
     state: AddMealUiState,
-    filteredIngredients: List<Ingredient>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
     onDismiss: () -> Unit,
     onIngredientSearchChange: (String) -> Unit,

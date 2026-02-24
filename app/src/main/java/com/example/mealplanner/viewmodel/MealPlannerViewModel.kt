@@ -93,9 +93,11 @@ class MealPlannerViewModel(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
             selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
             mealType = savedStateHandle[KEY_MEAL_TYPE] ?: "",
-            selectedStep = savedStateHandle[KEY_ADD_MEAL_STEP]?.let {
-                runCatching { AddMealStep.valueOf(it) }.getOrDefault(AddMealStep.BASIC_INFO)
-            } ?: AddMealStep.BASIC_INFO,
+
+            selectedStep = savedStateHandle.get<String>(KEY_ADD_MEAL_STEP)
+                ?.let { rawStep -> runCatching { AddMealStep.valueOf(rawStep) }.getOrDefault(AddMealStep.BASIC_INFO) }
+                ?: AddMealStep.BASIC_INFO,
+
             selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
             isIngredientSheetVisible = savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] ?: false,
             ingredientSearchQuery = savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] ?: "",
@@ -377,15 +379,6 @@ class MealPlannerViewModel(
         }
     }
 
-    fun updateDraftIngredientQuantity(index: Int, quantityInput: String) {
-        updateAddMealState { state ->
-            if (index !in state.selectedIngredients.indices) return@updateAddMealState state
-            val updated = state.selectedIngredients.toMutableList()
-            updated[index] = updated[index].copy(quantityInput = quantityInput)
-            state.copy(selectedIngredients = updated, error = null)
-        }
-    }
-
     fun removeDraftIngredient(index: Int) {
         updateAddMealState { state ->
             if (index !in state.selectedIngredients.indices) return@updateAddMealState state
@@ -481,10 +474,6 @@ class MealPlannerViewModel(
             if (purchased) current + key else current - key
         }
         persistPlannerStateIfEnabled()
-    }
-
-    fun isIngredientPurchased(ingredient: Ingredient): Boolean {
-        return ingredient.storageKey() in purchasedIngredientKeys.value
     }
 
     fun getAggregatedShoppingList(): List<Ingredient> {
