@@ -93,9 +93,11 @@ class MealPlannerViewModel(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
             selectedGroup = savedStateHandle[KEY_SELECTED_GROUP] ?: "",
             mealType = savedStateHandle[KEY_MEAL_TYPE] ?: "",
+
             selectedStep = savedStateHandle.get<String>(KEY_ADD_MEAL_STEP)
                 ?.let { rawStep -> runCatching { AddMealStep.valueOf(rawStep) }.getOrDefault(AddMealStep.BASIC_INFO) }
                 ?: AddMealStep.BASIC_INFO,
+
             selectedIngredients = decodeDraftIngredients(savedStateHandle[KEY_SELECTED_INGREDIENTS]),
             isIngredientSheetVisible = savedStateHandle[KEY_INGREDIENT_SHEET_VISIBLE] ?: false,
             ingredientSearchQuery = savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] ?: "",
