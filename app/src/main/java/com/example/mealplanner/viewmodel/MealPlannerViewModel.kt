@@ -258,7 +258,16 @@ class MealPlannerViewModel(
     }
 
     fun updateIngredientSearchQuery(value: String) {
-        updateAddMealState { it.copy(ingredientSearchQuery = value, error = null) }
+        val match = ingredientCatalog.value.firstOrNull { ingredient ->
+            ingredient.name.equals(value.trim(), ignoreCase = true)
+        }
+        updateAddMealState {
+            it.copy(
+                ingredientSearchQuery = value,
+                ingredientUnitInput = match?.unit ?: it.ingredientUnitInput,
+                error = null
+            )
+        }
     }
 
     fun selectIngredientFromCatalog(name: String, unit: String) {
