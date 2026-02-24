@@ -56,6 +56,15 @@ data class AddMealUiState(
     val error: String? = null
 )
 
+private fun List<MealIngredientDraft>.sortedAlphabetically(): List<MealIngredientDraft> {
+    return sortedWith(
+        compareBy<MealIngredientDraft>(
+            { it.name.lowercase(Locale.getDefault()) },
+            { it.unit.lowercase(Locale.getDefault()) }
+        )
+    )
+}
+
 enum class AddMealStep {
     BASIC_INFO,
     INGREDIENTS
@@ -380,7 +389,7 @@ class MealPlannerViewModel(
                     }
 
                     current.copy(
-                        selectedIngredients = updated,
+                        selectedIngredients = updated.sortedAlphabetically(),
                         error = null
                     )
                 }
@@ -393,7 +402,7 @@ class MealPlannerViewModel(
         updateAddMealState { state ->
             val updated = state.selectedIngredients.filterNot { it.id == draftId }
             if (updated.size == state.selectedIngredients.size) return@updateAddMealState state
-            state.copy(selectedIngredients = updated, error = null)
+            state.copy(selectedIngredients = updated.sortedAlphabetically(), error = null)
         }
     }
 
@@ -735,7 +744,7 @@ class MealPlannerViewModel(
                     unit = obj.optString("unit"),
                     quantityInput = obj.optString("quantityInput")
                 )
-            }
+            }.sortedAlphabetically()
         }.getOrDefault(emptyList())
     }
 

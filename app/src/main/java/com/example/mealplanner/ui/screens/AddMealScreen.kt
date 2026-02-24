@@ -1,5 +1,12 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
@@ -26,11 +34,14 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.local.Ingredient
@@ -65,6 +76,10 @@ fun AddMealScreen(
 ) {
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var mealTypeMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var removingIngredientIds by remember { mutableStateOf(setOf<String>()) }
+    val selectedIngredientsListState = rememberSaveable(saver = lazyListStateSaver()) {
+        LazyListState()
+    }
     val tabs = listOf(AddMealStep.BASIC_INFO to "Шаг 1: Основное", AddMealStep.INGREDIENTS to "Шаг 2: Ингредиенты")
 
     Column(
@@ -172,31 +187,60 @@ fun AddMealScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
+                        state = selectedIngredientsListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
                             items = state.selectedIngredients,
                             key = { item -> item.id }
                         ) { item ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = item.name)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(text = "${item.quantityInput} ${item.unit}")
+                            val visibilityState = remember(item.id) {
+                                MutableTransitionState(false).apply { targetState = true }
+                            }
+
+                            LaunchedEffect(removingIngredientIds.contains(item.id)) {
+                                visibilityState.targetState = !removingIngredientIds.contains(item.id)
+                            }
+
+                            AnimatedVisibility(
+                                visibleState = visibilityState,
+                                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+                            ) {
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = item.name)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(text = "${item.quantityInput} ${item.unit}")
+                                        }
+                                        IconButton(onClick = { onEditDraftIngredient(item.id) }) {
+                                            Text("✏️")
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                if (item.id !in removingIngredientIds) {
+                                                    removingIngredientIds = removingIngredientIds + item.id
+                                                }
+                                            }
+                                        ) {
+                                            Text("🗑️")
+                                        }
                                     }
-                                    IconButton(onClick = { onEditDraftIngredient(item.id) }) {
-                                        Text("✏️")
-                                    }
-                                    IconButton(onClick = { onRemoveDraftIngredient(item.id) }) {
-                                        Text("🗑️")
-                                    }
+                                }
+                            }
+
+                            if (item.id in removingIngredientIds && visibilityState.isIdle && !visibilityState.currentState) {
+                                LaunchedEffect(item.id) {
+                                    delay(40)
+                                    onRemoveDraftIngredient(item.id)
+                                    removingIngredientIds = removingIngredientIds - item.id
                                 }
                             }
                         }
@@ -246,7 +290,11 @@ private fun IngredientSheet(
     onConfirm: () -> Unit
 ) {
     var unitExpanded by remember { mutableStateOf(false) }
-    val selectedUnit = state.ingredientUnitInput.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
+    val selectedUnit = state.ingredientUnitInput
+    val availableUnits = remember(selectedUnit) {
+        if (selectedUnit.isBlank() || SUPPORTED_UNITS.contains(selectedUnit)) SUPPORTED_UNITS
+        else listOf(selectedUnit) + SUPPORTED_UNITS
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -284,8 +332,7 @@ private fun IngredientSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    val preselectedUnit = ingredient.unit.takeIf { unit -> SUPPORTED_UNITS.contains(unit) }.orEmpty()
-                                    onIngredientSelect(ingredient.name, preselectedUnit)
+                                    onIngredientSelect(ingredient.name, ingredient.unit)
                                 }
                                 .padding(8.dp)
                         )
@@ -312,7 +359,7 @@ private fun IngredientSheet(
                     expanded = unitExpanded,
                     onDismissRequest = { unitExpanded = false }
                 ) {
-                    SUPPORTED_UNITS.forEach { unit ->
+                    availableUnits.forEach { unit ->
                         DropdownMenuItem(
                             text = { Text(unit) },
                             onClick = {
@@ -336,4 +383,16 @@ private fun IngredientSheet(
             }
         }
     }
+}
+
+private fun lazyListStateSaver(): Saver<LazyListState, List<Int>> {
+    return Saver(
+        save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
+        restore = { restored ->
+            LazyListState(
+                firstVisibleItemIndex = restored.getOrElse(0) { 0 },
+                firstVisibleItemScrollOffset = restored.getOrElse(1) { 0 }
+            )
+        }
+    )
 }
