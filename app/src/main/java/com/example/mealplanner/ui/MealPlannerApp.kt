@@ -59,6 +59,7 @@ fun MealPlannerApp(
     val purchasedIngredientKeys by mealPlannerViewModel.purchasedIngredientKeys.collectAsState()
     val addMealState by mealPlannerViewModel.addMealUiState.collectAsState()
     val groupedFilteredIngredientCatalog by mealPlannerViewModel.groupedFilteredIngredientCatalog.collectAsState()
+    val ingredientGroups by mealPlannerViewModel.ingredientGroups.collectAsState()
     val undoUiState by mealPlannerViewModel.undoUiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -203,6 +204,7 @@ fun MealPlannerApp(
                 AddMealScreen(
                     groups = groups,
                     groupedFilteredIngredients = groupedFilteredIngredientCatalog,
+                    ingredientGroups = ingredientGroups,
                     state = addMealState,
                     animationsEnabled = settings.animationsEnabled,
                     onBack = { navController.popBackStack() },
@@ -216,6 +218,10 @@ fun MealPlannerApp(
                     onIngredientSelect = mealPlannerViewModel::selectIngredientFromCatalog,
                     onIngredientUnitChange = mealPlannerViewModel::updateIngredientUnitInput,
                     onIngredientQuantityChange = mealPlannerViewModel::updateIngredientQuantityInput,
+                    onIngredientGroupSelect = mealPlannerViewModel::updateIngredientGroupSelection,
+                    onCreateIngredientGroup = mealPlannerViewModel::createIngredientGroup,
+                    onDeleteIngredientGroup = mealPlannerViewModel::deleteIngredientGroup,
+                    onDeleteCatalogIngredient = mealPlannerViewModel::deleteCatalogIngredient,
                     onConfirmIngredient = { mealPlannerViewModel.confirmIngredientFromSheet() },
                     onEditDraftIngredient = mealPlannerViewModel::editDraftIngredient,
                     onRemoveDraftIngredient = mealPlannerViewModel::removeDraftIngredient,

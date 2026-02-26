@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Meal::class,
         MealIngredientCrossRef::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class MealPlannerDatabase : RoomDatabase() {
@@ -135,6 +135,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     CREATE TABLE IF NOT EXISTS ingredient_groups (
                         id TEXT NOT NULL,
                         name TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
                         PRIMARY KEY(id)
                     )
                     """.trimIndent()
@@ -143,9 +144,9 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_ingredient_groups_name ON ingredient_groups(name)"
                 )
 
-                val defaultGroupId = java.util.UUID.randomUUID().toString()
+                val defaultGroupId = "default-other-group"
                 db.execSQL(
-                    "INSERT OR IGNORE INTO ingredient_groups(id, name) VALUES('$defaultGroupId', 'Other')"
+                    "INSERT OR IGNORE INTO ingredient_groups(id, name, createdAt) VALUES('$defaultGroupId', 'Other', strftime('%s','now') * 1000)"
                 )
 
                 db.execSQL(
@@ -155,14 +156,15 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                         name TEXT NOT NULL,
                         unit TEXT NOT NULL,
                         groupId TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
                         FOREIGN KEY(groupId) REFERENCES ingredient_groups(id) ON UPDATE CASCADE ON DELETE RESTRICT
                     )
                     """.trimIndent()
                 )
                 db.execSQL(
                     """
-                    INSERT INTO ingredients_new(id, name, unit, groupId)
-                    SELECT id, name, unit, '$defaultGroupId'
+                    INSERT INTO ingredients_new(id, name, unit, groupId, createdAt)
+                    SELECT id, name, unit, '$defaultGroupId', strftime('%s','now') * 1000
                     FROM ingredients
                     """.trimIndent()
                 )
@@ -173,6 +175,17 @@ abstract class MealPlannerDatabase : RoomDatabase() {
             }
         }
 
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn(tableName = "ingredient_groups", columnName = "createdAt")) {
+                    db.execSQL("ALTER TABLE ingredient_groups ADD COLUMN createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)")
+                }
+                if (!db.hasColumn(tableName = "ingredients", columnName = "createdAt")) {
+                    db.execSQL("ALTER TABLE ingredients ADD COLUMN createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)")
+                }
+            }
+        }
         private fun SupportSQLiteDatabase.hasColumn(tableName: String, columnName: String): Boolean {
             query(SimpleSQLiteQuery("PRAGMA table_info($tableName)")).use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -192,7 +205,13 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     MealPlannerDatabase::class.java,
                     "meal_planner.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            super.onCreate(db)
+                            db.execSQL("INSERT OR IGNORE INTO ingredient_groups(id, name, createdAt) VALUES('default-other-group', 'Other', strftime('%s','now') * 1000)")
+                        }
+                    })
                     .build()
                     .also { INSTANCE = it }
             }

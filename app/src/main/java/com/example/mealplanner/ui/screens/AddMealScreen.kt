@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.IconButton
@@ -37,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,12 +49,13 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.mealplanner.data.IngredientRepository
 import com.example.mealplanner.data.local.Ingredient
+import com.example.mealplanner.data.local.IngredientGroup
 import com.example.mealplanner.ui.presentation.toRussianUnitLabel
 import com.example.mealplanner.viewmodel.AddMealStep
 import com.example.mealplanner.viewmodel.AddMealUiState
 
-private const val INGREDIENT_OTHER_CATEGORY = "Other"
 private val SUPPORTED_UNITS = listOf("g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "pack")
 private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Перекус")
 
@@ -61,6 +64,7 @@ private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Пе�
 fun AddMealScreen(
     groups: List<String>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
+    ingredientGroups: List<IngredientGroup>,
     state: AddMealUiState,
     animationsEnabled: Boolean,
     onBack: () -> Unit,
@@ -74,6 +78,10 @@ fun AddMealScreen(
     onIngredientSelect: (String, String) -> Unit,
     onIngredientUnitChange: (String) -> Unit,
     onIngredientQuantityChange: (String) -> Unit,
+    onIngredientGroupSelect: (String) -> Unit,
+    onCreateIngredientGroup: (String) -> Boolean,
+    onDeleteIngredientGroup: (String) -> Unit,
+    onDeleteCatalogIngredient: (Long) -> Unit,
     onConfirmIngredient: () -> Unit,
     onEditDraftIngredient: (String) -> Unit,
     onRemoveDraftIngredient: (String) -> Unit,
@@ -295,8 +303,13 @@ fun AddMealScreen(
             onDismiss = onCloseIngredientSheet,
             onIngredientSearchChange = onIngredientSearchChange,
             onIngredientSelect = onIngredientSelect,
+            ingredientGroups = ingredientGroups,
             onUnitChange = onIngredientUnitChange,
             onQuantityChange = onIngredientQuantityChange,
+            onGroupSelect = onIngredientGroupSelect,
+            onCreateGroup = onCreateIngredientGroup,
+            onDeleteGroup = onDeleteIngredientGroup,
+            onDeleteIngredient = onDeleteCatalogIngredient,
             onConfirm = onConfirmIngredient
         )
     }
@@ -377,6 +390,40 @@ private fun DraftIngredientCard(
 
         }
     }
+
+    groupToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { groupToDelete = null },
+            title = { Text("Удалить группу?") },
+            text = { Text("Все ингредиенты из '${target.name}' будут перемещены в '${IngredientRepository.DEFAULT_GROUP_NAME}'.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteGroup(target.id)
+                    groupToDelete = null
+                }) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupToDelete = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    ingredientToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { ingredientToDelete = null },
+            title = { Text("Удалить ингредиент?") },
+            text = { Text(target.name) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteIngredient(target.id)
+                    ingredientToDelete = null
+                }) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ingredientToDelete = null }) { Text("Отмена") }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -384,14 +431,23 @@ private fun DraftIngredientCard(
 private fun IngredientSheet(
     state: AddMealUiState,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
+    ingredientGroups: List<IngredientGroup>,
     onDismiss: () -> Unit,
     onIngredientSearchChange: (String) -> Unit,
     onIngredientSelect: (String, String) -> Unit,
     onUnitChange: (String) -> Unit,
     onQuantityChange: (String) -> Unit,
+    onGroupSelect: (String) -> Unit,
+    onCreateGroup: (String) -> Boolean,
+    onDeleteGroup: (String) -> Unit,
+    onDeleteIngredient: (Long) -> Unit,
     onConfirm: () -> Unit
 ) {
     var unitExpanded by remember { mutableStateOf(false) }
+    var ingredientGroupExpanded by remember { mutableStateOf(false) }
+    var newGroupName by remember { mutableStateOf("") }
+    var groupToDelete by remember { mutableStateOf<IngredientGroup?>(null) }
+    var ingredientToDelete by remember { mutableStateOf<Ingredient?>(null) }
     val selectedUnit = state.ingredientUnitInput
     val availableUnits = remember(selectedUnit) {
         if (selectedUnit.isBlank() || SUPPORTED_UNITS.contains(selectedUnit)) SUPPORTED_UNITS
@@ -414,6 +470,53 @@ private fun IngredientSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            ExposedDropdownMenuBox(
+                expanded = ingredientGroupExpanded,
+                onExpandedChange = { ingredientGroupExpanded = !ingredientGroupExpanded }
+            ) {
+                val selectedGroupName = ingredientGroups.firstOrNull { it.id == state.ingredientGroupId }?.name
+                    ?: IngredientRepository.DEFAULT_GROUP_NAME
+                OutlinedTextField(
+                    value = selectedGroupName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Группа ингредиента") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = ingredientGroupExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+
+                androidx.compose.material3.DropdownMenu(
+                    expanded = ingredientGroupExpanded,
+                    onDismissRequest = { ingredientGroupExpanded = false }
+                ) {
+                    ingredientGroups.forEach { group ->
+                        DropdownMenuItem(
+                            text = { Text(group.name) },
+                            onClick = {
+                                onGroupSelect(group.id)
+                                ingredientGroupExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it },
+                    label = { Text("Новая группа") },
+                    modifier = Modifier.weight(1f)
+                )
+                Button(onClick = {
+                    if (onCreateGroup(newGroupName)) {
+                        newGroupName = ""
+                    }
+                }) {
+                    Text("Создать")
+                }
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -424,20 +527,30 @@ private fun IngredientSheet(
                 groupedFilteredIngredients.forEach { (category, ingredients) ->
                     item(key = "header_$category") {
                         Text(
-                            text = category.ifBlank { INGREDIENT_OTHER_CATEGORY },
+                            text = category,
                             modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp)
                         )
                     }
                     items(items = ingredients, key = { item -> item.id }) { ingredient ->
-                        Text(
-                            text = "${ingredient.name} (${ingredient.unit.toRussianUnitLabel()})",
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    onIngredientSelect(ingredient.name, ingredient.unit)
-                                }
-                                .padding(8.dp)
-                        )
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${ingredient.name} (${ingredient.unit.toRussianUnitLabel()})",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        onIngredientSelect(ingredient.name, ingredient.unit)
+                                    }
+                                    .padding(vertical = 8.dp)
+                            )
+                            IconButton(onClick = { ingredientToDelete = ingredient }) {
+                                Text("🗑️")
+                            }
+                        }
                     }
                 }
             }
@@ -480,9 +593,58 @@ private fun IngredientSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Text("Удаление групп")
+            ingredientGroups.forEach { group ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(group.name, modifier = Modifier.weight(1f))
+                    val isDefault = group.name.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true)
+                    IconButton(onClick = { if (!isDefault) groupToDelete = group }, enabled = !isDefault) {
+                        Text("🗑️")
+                    }
+                }
+            }
+
             Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
                 Text("Добавить")
             }
         }
     }
+
+    groupToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { groupToDelete = null },
+            title = { Text("Удалить группу?") },
+            text = { Text("Все ингредиенты из '${target.name}' будут перемещены в '${IngredientRepository.DEFAULT_GROUP_NAME}'.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteGroup(target.id)
+                    groupToDelete = null
+                }) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupToDelete = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    ingredientToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { ingredientToDelete = null },
+            title = { Text("Удалить ингредиент?") },
+            text = { Text(target.name) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteIngredient(target.id)
+                    ingredientToDelete = null
+                }) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ingredientToDelete = null }) { Text("Отмена") }
+            }
+        )
+    }
+
 }

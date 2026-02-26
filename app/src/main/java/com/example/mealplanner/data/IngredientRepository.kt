@@ -26,7 +26,7 @@ class IngredientRepository(context: Context) {
 
     suspend fun ensureDefaultGroup(): IngredientGroup = db.withTransaction {
         ingredientGroupDao.findByName(DEFAULT_GROUP_NAME) ?: IngredientGroup(
-            id = UUID.randomUUID().toString(),
+            id = DEFAULT_GROUP_ID,
             name = DEFAULT_GROUP_NAME
         ).also { ingredientGroupDao.insert(it) }
     }
@@ -74,11 +74,12 @@ class IngredientRepository(context: Context) {
         ingredientDao.delete(ingredient)
     }
 
-    suspend fun deleteById(ingredientId: Long) {
+    suspend fun deleteIngredient(ingredientId: Long) {
         ingredientDao.deleteById(ingredientId)
     }
 
     companion object {
         const val DEFAULT_GROUP_NAME = "Other"
+        const val DEFAULT_GROUP_ID = "default-other-group"
     }
 }
