@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -209,7 +210,11 @@ fun AddMealScreen(
                                 enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
                                 exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
                             ) {
-                                Card(modifier = Modifier.fillMaxWidth()) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateItemPlacement()
+                                ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
