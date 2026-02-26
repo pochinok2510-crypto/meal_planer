@@ -44,6 +44,9 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val meals by viewModel.meals.collectAsState()
+    val filteredMeals by viewModel.filteredMeals.collectAsState()
+    val mealFilters by viewModel.mealFilters.collectAsState()
+    val mealFilterOptions by viewModel.menuMealFilterOptions.collectAsState()
     val groups by viewModel.groups.collectAsState()
     val weeklyPlan by viewModel.weeklyPlan.collectAsState()
     val settings by viewModel.settings.collectAsState()
@@ -133,14 +136,20 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         ) {
             composable(Screen.Menu.route) {
                 MenuScreen(
-                    meals = meals,
+                    meals = filteredMeals,
                     groups = groups,
+                    mealFilterState = mealFilters,
+                    mealFilterOptions = mealFilterOptions,
                     onRemoveMeal = viewModel::removeMeal,
                     onMoveMealToGroup = viewModel::moveMealToGroup,
                     onDuplicateMealToGroup = viewModel::duplicateMealToGroup,
                     onCreateGroup = viewModel::addGroup,
                     onDeleteGroup = viewModel::removeGroup,
                     onEditGroup = viewModel::renameGroup,
+                    onMealFilterGroupSelect = viewModel::updateMealFilterGroup,
+                    onMealFilterIngredientSelect = viewModel::updateMealFilterIngredient,
+                    onMealFilterCategorySelect = viewModel::updateMealFilterCategory,
+                    onClearMealFilters = viewModel::clearMealFilters,
                     onNavigateToAddMeal = { navController.navigate(Screen.AddMeal.route) },
                     onNavigateToShopping = { navController.navigate(Screen.ShoppingList.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }

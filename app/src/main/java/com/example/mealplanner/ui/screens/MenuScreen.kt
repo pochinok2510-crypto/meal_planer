@@ -22,8 +22,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,18 +44,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
+import com.example.mealplanner.viewmodel.MealFilterOptions
+import com.example.mealplanner.viewmodel.MealFilterState
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MenuScreen(
     meals: List<Meal>,
     groups: List<String>,
+    mealFilterState: MealFilterState,
+    mealFilterOptions: MealFilterOptions,
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
     onCreateGroup: (String) -> Boolean,
     onDeleteGroup: (String) -> Unit,
     onEditGroup: (String, String) -> Boolean,
+    onMealFilterGroupSelect: (String?) -> Unit,
+    onMealFilterIngredientSelect: (String?) -> Unit,
+    onMealFilterCategorySelect: (String?) -> Unit,
+    onClearMealFilters: () -> Unit,
     onNavigateToAddMeal: () -> Unit,
     onNavigateToShopping: () -> Unit,
     onNavigateToSettings: () -> Unit
@@ -65,6 +75,7 @@ fun MenuScreen(
     var groupPendingEdit by remember { mutableStateOf<String?>(null) }
     var editGroupName by remember { mutableStateOf("") }
     var expandedGroups by rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    var isFilterSheetVisible by rememberSaveable { mutableStateOf(false) }
 
     val normalizedSearch = searchQuery.trim().lowercase()
 
@@ -80,6 +91,24 @@ fun MenuScreen(
             label = { Text("Поиск блюд") },
             modifier = Modifier.fillMaxWidth()
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { isFilterSheetVisible = true },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Фильтры")
+            }
+            TextButton(
+                onClick = onClearMealFilters,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Сбросить фильтры")
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -174,6 +203,19 @@ fun MenuScreen(
         }
     }
 
+
+
+    if (isFilterSheetVisible) {
+        MealFilterBottomSheet(
+            state = mealFilterState,
+            options = mealFilterOptions,
+            onGroupSelect = onMealFilterGroupSelect,
+            onIngredientSelect = onMealFilterIngredientSelect,
+            onCategorySelect = onMealFilterCategorySelect,
+            onDismiss = { isFilterSheetVisible = false }
+        )
+    }
+
     groupPendingDelete?.let { group ->
         AlertDialog(
             onDismissRequest = { groupPendingDelete = null },
@@ -222,6 +264,100 @@ fun MenuScreen(
                 TextButton(onClick = { groupPendingEdit = null }) { Text("Отмена") }
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MealFilterBottomSheet(
+    state: MealFilterState,
+    options: MealFilterOptions,
+    onGroupSelect: (String?) -> Unit,
+    onIngredientSelect: (String?) -> Unit,
+    onCategorySelect: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var groupExpanded by remember { mutableStateOf(false) }
+    var ingredientExpanded by remember { mutableStateOf(false) }
+    var categoryExpanded by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FilterDropdownField(
+                label = "Группа",
+                selectedValue = state.selectedGroup,
+                expanded = groupExpanded,
+                values = options.groups,
+                onExpandedChange = { groupExpanded = !groupExpanded },
+                onDismissRequest = { groupExpanded = false },
+                onSelect = {
+                    onGroupSelect(it)
+                    groupExpanded = false
+                }
+            )
+            FilterDropdownField(
+                label = "Ингредиент",
+                selectedValue = state.selectedIngredient,
+                expanded = ingredientExpanded,
+                values = options.ingredients,
+                onExpandedChange = { ingredientExpanded = !ingredientExpanded },
+                onDismissRequest = { ingredientExpanded = false },
+                onSelect = {
+                    onIngredientSelect(it)
+                    ingredientExpanded = false
+                }
+            )
+            FilterDropdownField(
+                label = "Категория",
+                selectedValue = state.selectedCategory,
+                expanded = categoryExpanded,
+                values = options.categories,
+                onExpandedChange = { categoryExpanded = !categoryExpanded },
+                onDismissRequest = { categoryExpanded = false },
+                onSelect = {
+                    onCategorySelect(it)
+                    categoryExpanded = false
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun FilterDropdownField(
+    label: String,
+    selectedValue: String?,
+    expanded: Boolean,
+    values: List<String>,
+    onExpandedChange: () -> Unit,
+    onDismissRequest: () -> Unit,
+    onSelect: (String?) -> Unit
+) {
+    Box {
+        OutlinedTextField(
+            value = selectedValue ?: "Все",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = onExpandedChange)
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismissRequest
+        ) {
+            DropdownMenuItem(text = { Text("Все") }, onClick = { onSelect(null) })
+            values.forEach { value ->
+                DropdownMenuItem(text = { Text(value) }, onClick = { onSelect(value) })
+            }
+        }
     }
 }
 
