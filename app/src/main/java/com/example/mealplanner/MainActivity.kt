@@ -26,7 +26,8 @@ class MainActivity : ComponentActivity() {
 
             MealPlannerTheme(
                 themeMode = settings.themeMode,
-                accentPalette = settings.accentPalette
+                accentPalette = settings.accentPalette,
+                densityMode = settings.densityMode
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     MealPlannerApp(

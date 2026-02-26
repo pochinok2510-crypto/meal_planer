@@ -31,6 +31,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.mealplanner.ui.navigation.Screen
+import com.example.mealplanner.ui.presentation.ProvideUiDensity
 import com.example.mealplanner.ui.screens.AddMealScreen
 import com.example.mealplanner.ui.screens.MenuScreen
 import com.example.mealplanner.ui.screens.SettingsScreen
@@ -126,7 +127,8 @@ fun MealPlannerApp(
 
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
 
-    Scaffold(
+    ProvideUiDensity(densityMode = settings.densityMode) {
+        Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -257,6 +259,7 @@ fun MealPlannerApp(
                     onClearAfterExportToggle = mealPlannerViewModel::updateClearShoppingAfterExport,
                     onThemeModeSelect = appViewModel::updateThemeMode,
                     onAccentPaletteSelect = appViewModel::updateAccentPalette,
+                    onDensityModeSelect = appViewModel::updateDensityMode,
                     onExportDatabase = {
                         saveDatabaseExportLauncher.launch("meal-planner-export-${System.currentTimeMillis()}.json")
                     },

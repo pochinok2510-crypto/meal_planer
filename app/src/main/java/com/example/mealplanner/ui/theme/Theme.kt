@@ -3,12 +3,16 @@ package com.example.mealplanner.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import com.example.mealplanner.model.AccentPalette
 import com.example.mealplanner.model.AppThemeMode
+import com.example.mealplanner.model.DensityMode
+import com.example.mealplanner.ui.presentation.toUiDensitySpec
 
 private val EmeraldLightColors = lightColorScheme(
     primary = Color(0xFF2E7D32),
@@ -62,6 +66,7 @@ private val LavenderDarkColors = darkColorScheme(
 fun MealPlannerTheme(
     themeMode: AppThemeMode,
     accentPalette: AccentPalette,
+    densityMode: DensityMode,
     content: @Composable () -> Unit
 ) {
     val useDarkTheme = when (themeMode) {
@@ -71,9 +76,11 @@ fun MealPlannerTheme(
     }
 
     val colorScheme = resolveColorScheme(accentPalette = accentPalette, darkTheme = useDarkTheme)
+    val fontScale = densityMode.toUiDensitySpec().fontScaleMultiplier
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = scaledTypography(fontScale),
         content = content
     )
 }
@@ -85,4 +92,33 @@ private fun resolveColorScheme(accentPalette: AccentPalette, darkTheme: Boolean)
         AccentPalette.SUNSET -> if (darkTheme) SunsetDarkColors else SunsetLightColors
         AccentPalette.LAVENDER -> if (darkTheme) LavenderDarkColors else LavenderLightColors
     }
+}
+
+private fun scaledTypography(multiplier: Float): Typography {
+    val base = Typography()
+    return base.copy(
+        displayLarge = base.displayLarge.scaled(multiplier),
+        displayMedium = base.displayMedium.scaled(multiplier),
+        displaySmall = base.displaySmall.scaled(multiplier),
+        headlineLarge = base.headlineLarge.scaled(multiplier),
+        headlineMedium = base.headlineMedium.scaled(multiplier),
+        headlineSmall = base.headlineSmall.scaled(multiplier),
+        titleLarge = base.titleLarge.scaled(multiplier),
+        titleMedium = base.titleMedium.scaled(multiplier),
+        titleSmall = base.titleSmall.scaled(multiplier),
+        bodyLarge = base.bodyLarge.scaled(multiplier),
+        bodyMedium = base.bodyMedium.scaled(multiplier),
+        bodySmall = base.bodySmall.scaled(multiplier),
+        labelLarge = base.labelLarge.scaled(multiplier),
+        labelMedium = base.labelMedium.scaled(multiplier),
+        labelSmall = base.labelSmall.scaled(multiplier)
+    )
+}
+
+private fun TextStyle.scaled(multiplier: Float): TextStyle {
+    return copy(
+        fontSize = fontSize * multiplier,
+        lineHeight = lineHeight * multiplier,
+        letterSpacing = letterSpacing * multiplier
+    )
 }

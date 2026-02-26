@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.mealplanner.model.AccentPalette
 import com.example.mealplanner.model.AppThemeMode
+import com.example.mealplanner.model.DensityMode
 import com.example.mealplanner.model.SettingsState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -26,7 +27,10 @@ class SettingsDataStore(private val context: Context) {
                 ?: AppThemeMode.SYSTEM,
             accentPalette = preferences[Keys.ACCENT_PALETTE]
                 ?.let { raw -> runCatching { AccentPalette.valueOf(raw) }.getOrNull() }
-                ?: AccentPalette.EMERALD
+                ?: AccentPalette.EMERALD,
+            densityMode = preferences[Keys.DENSITY_MODE]
+                ?.let { raw -> runCatching { DensityMode.valueOf(raw) }.getOrNull() }
+                ?: DensityMode.NORMAL
         )
     }
 
@@ -54,10 +58,17 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun setDensityMode(mode: DensityMode) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.DENSITY_MODE] = mode.name
+        }
+    }
+
     private object Keys {
         val PERSIST_DATA_BETWEEN_LAUNCHES = booleanPreferencesKey("persist_data_between_launches")
         val CLEAR_SHOPPING_AFTER_EXPORT = booleanPreferencesKey("clear_shopping_after_export")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ACCENT_PALETTE = stringPreferencesKey("accent_palette")
+        val DENSITY_MODE = stringPreferencesKey("density_mode")
     }
 }
