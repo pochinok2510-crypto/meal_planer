@@ -2,18 +2,24 @@ package com.example.mealplanner.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -28,7 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
@@ -135,6 +145,7 @@ fun MenuScreen(
                 items(mealsInGroup, key = { it.id }) { meal ->
                     AnimatedVisibility(visible = isExpanded) {
                         MealCard(
+                            modifier = Modifier.padding(start = 12.dp),
                             meal = meal,
                             groups = groups,
                             onRemove = { onRemoveMeal(meal) },
@@ -224,24 +235,47 @@ private fun GroupHeader(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TextButton(onClick = onToggleExpanded) {
-            Text(if (isExpanded) "▲" else "▼")
-        }
-        Text(
-            text = "$group ($mealCount)",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f)
+    val accentColor = groupAccentColor(group)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = lerp(accentColor, MaterialTheme.colorScheme.surface, 0.82f)
         )
-        if (canManage) {
-            TextButton(onClick = onEdit) {
-                Text("Изм.")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(accentColor)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            TextButton(onClick = onToggleExpanded) {
+                Text(if (isExpanded) "▲" else "▼")
             }
-            TextButton(onClick = onDelete) {
-                Text("Удалить")
+            Text(
+                text = "$group ($mealCount)",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            if (canManage) {
+                TextButton(onClick = onEdit) {
+                    Text("Изм.")
+                }
+                TextButton(onClick = onDelete) {
+                    Text("Удалить")
+                }
             }
         }
     }
@@ -250,6 +284,7 @@ private fun GroupHeader(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MealCard(
+    modifier: Modifier = Modifier,
     meal: Meal,
     groups: List<String>,
     onRemove: () -> Unit,
@@ -260,12 +295,14 @@ private fun MealCard(
     var duplicateExpanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = {},
                 onLongClick = onRemove
-            )
+            ),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -318,4 +355,16 @@ private fun MealCard(
             }
         }
     }
+}
+
+@Composable
+private fun groupAccentColor(group: String): Color {
+    val accents = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.error
+    )
+    val index = group.hashCode().mod(accents.size)
+    return accents[index]
 }
