@@ -23,5 +23,6 @@ data class SettingsState(
     val clearShoppingAfterExport: Boolean = false,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val accentPalette: AccentPalette = AccentPalette.EMERALD,
-    val densityMode: DensityMode = DensityMode.NORMAL
+    val densityMode: DensityMode = DensityMode.NORMAL,
+    val animationsEnabled: Boolean = true
 )

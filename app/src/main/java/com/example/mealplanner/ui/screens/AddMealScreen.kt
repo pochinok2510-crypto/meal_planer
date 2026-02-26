@@ -62,6 +62,7 @@ fun AddMealScreen(
     groups: List<String>,
     groupedFilteredIngredients: Map<String, List<Ingredient>>,
     state: AddMealUiState,
+    animationsEnabled: Boolean,
     onBack: () -> Unit,
     onMealNameChange: (String) -> Unit,
     onGroupSelect: (String) -> Unit,
@@ -209,85 +210,62 @@ fun AddMealScreen(
                                 visibilityState.targetState = !removingIngredientIds.contains(item.id)
                             }
 
-                            AnimatedVisibility(
-                                visibleState = visibilityState,
-                                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
-                                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-                            ) {
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .pointerInput(state.selectedIngredients.size) {
-                                            detectDragGesturesAfterLongPress(
-                                                onDragStart = {
-                                                    draggingIndex = index
-                                                },
-                                                onDragEnd = {
-                                                    draggingIndex = null
-                                                },
-                                                onDragCancel = {
-                                                    draggingIndex = null
-                                                },
-                                                onDrag = { change, dragAmount ->
-                                                    change.consume()
-                                                    if (dragAmount.y == 0f) return@detectDragGesturesAfterLongPress
+                            val removeRequested = item.id in removingIngredientIds
 
-                                                    val currentIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
-                                                    val currentItem = dragListState.layoutInfo.visibleItemsInfo
-                                                        .firstOrNull { it.index == currentIndex }
-                                                        ?: return@detectDragGesturesAfterLongPress
-
-                                                    val currentCenter = currentItem.offset + (currentItem.size / 2) + dragAmount.y
-                                                    val target = dragListState.layoutInfo.visibleItemsInfo
-                                                        .firstOrNull { info ->
-                                                            currentCenter.toInt() in info.offset..(info.offset + info.size)
-                                                        }
-                                                        ?: return@detectDragGesturesAfterLongPress
-
-                                                    if (target.index != currentIndex) {
-                                                        onReorderDraftIngredient(currentIndex, target.index)
-                                                        draggingIndex = target.index
-                                                    }
-                                                }
-                                            )
-                                        }
-
+                            if (animationsEnabled) {
+                                AnimatedVisibility(
+                                    visibleState = visibilityState,
+                                    enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                                    exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(text = item.name)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(text = "${item.quantityInput} ${item.unit.toRussianUnitLabel()}")
-                                        }
-                                        Text("⋮⋮")
-                                        IconButton(onClick = { onEditDraftIngredient(item.id) }) {
-                                            Text("✏️")
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                if (item.id !in removingIngredientIds) {
-                                                    removingIngredientIds = removingIngredientIds + item.id
-                                                }
+                                    DraftIngredientCard(
+                                        item = item,
+                                        selectedCount = state.selectedIngredients.size,
+                                        dragListState = dragListState,
+                                        index = index,
+                                        draggingIndex = draggingIndex,
+                                        onDraggingIndexChange = { draggingIndex = it },
+                                        onReorderDraftIngredient = onReorderDraftIngredient,
+                                        onEditDraftIngredient = onEditDraftIngredient,
+                                        onRequestRemove = {
+                                            if (item.id !in removingIngredientIds) {
+                                                removingIngredientIds = removingIngredientIds + item.id
                                             }
-                                        ) {
-                                            Text("🗑️")
                                         }
-
-                                    }
+                                    )
                                 }
+                            } else if (!removeRequested) {
+                                DraftIngredientCard(
+                                    item = item,
+                                    selectedCount = state.selectedIngredients.size,
+                                    dragListState = dragListState,
+                                    index = index,
+                                    draggingIndex = draggingIndex,
+                                    onDraggingIndexChange = { draggingIndex = it },
+                                    onReorderDraftIngredient = onReorderDraftIngredient,
+                                    onEditDraftIngredient = onEditDraftIngredient,
+                                    onRequestRemove = {
+                                        if (item.id !in removingIngredientIds) {
+                                            removingIngredientIds = removingIngredientIds + item.id
+                                        }
+                                    }
+                                )
                             }
 
-                            if (item.id in removingIngredientIds && visibilityState.isIdle && !visibilityState.currentState) {
-                                LaunchedEffect(item.id) {
-                                    delay(40)
-                                    onRemoveDraftIngredient(item.id)
-                                    removingIngredientIds = removingIngredientIds - item.id
+                            if (removeRequested) {
+                                if (animationsEnabled) {
+                                    if (visibilityState.isIdle && !visibilityState.currentState) {
+                                        LaunchedEffect(item.id) {
+                                            delay(40)
+                                            onRemoveDraftIngredient(item.id)
+                                            removingIngredientIds = removingIngredientIds - item.id
+                                        }
+                                    }
+                                } else {
+                                    LaunchedEffect(item.id) {
+                                        onRemoveDraftIngredient(item.id)
+                                        removingIngredientIds = removingIngredientIds - item.id
+                                    }
                                 }
                             }
                         }
@@ -321,6 +299,83 @@ fun AddMealScreen(
             onQuantityChange = onIngredientQuantityChange,
             onConfirm = onConfirmIngredient
         )
+    }
+}
+
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DraftIngredientCard(
+    item: com.example.mealplanner.viewmodel.DraftIngredientItem,
+    selectedCount: Int,
+    dragListState: androidx.compose.foundation.lazy.LazyListState,
+    index: Int,
+    draggingIndex: Int?,
+    onDraggingIndexChange: (Int?) -> Unit,
+    onReorderDraftIngredient: (Int, Int) -> Unit,
+    onEditDraftIngredient: (String) -> Unit,
+    onRequestRemove: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(selectedCount) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        onDraggingIndexChange(index)
+                    },
+                    onDragEnd = {
+                        onDraggingIndexChange(null)
+                    },
+                    onDragCancel = {
+                        onDraggingIndexChange(null)
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (dragAmount.y == 0f) return@detectDragGesturesAfterLongPress
+
+                        val currentIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                        val currentItem = dragListState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { it.index == currentIndex }
+                            ?: return@detectDragGesturesAfterLongPress
+
+                        val currentCenter = currentItem.offset + (currentItem.size / 2) + dragAmount.y
+                        val target = dragListState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { info ->
+                                currentCenter.toInt() in info.offset..(info.offset + info.size)
+                            }
+                            ?: return@detectDragGesturesAfterLongPress
+
+                        if (target.index != currentIndex) {
+                            onReorderDraftIngredient(currentIndex, target.index)
+                            onDraggingIndexChange(target.index)
+                        }
+                    }
+                )
+            }
+
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = item.name)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "${item.quantityInput} ${item.unit.toRussianUnitLabel()}")
+            }
+            Text("⋮⋮")
+            IconButton(onClick = { onEditDraftIngredient(item.id) }) {
+                Text("✏️")
+            }
+            IconButton(onClick = onRequestRemove) {
+                Text("🗑️")
+            }
+
+        }
     }
 }
 

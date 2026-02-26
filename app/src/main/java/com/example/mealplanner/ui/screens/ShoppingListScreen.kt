@@ -52,6 +52,7 @@ fun ShoppingListScreen(
     ingredients: List<Ingredient>,
     categoriesByStorageKey: Map<String, String>,
     dayCount: Int,
+    animationsEnabled: Boolean,
     purchasedIngredientKeys: Set<String>,
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
     onRemoveIngredient: (Ingredient) -> Unit,
@@ -96,19 +97,45 @@ fun ShoppingListScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = ingredients.isEmpty(),
-            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
-            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-        ) {
+        if (animationsEnabled) {
+            AnimatedVisibility(
+                visible = ingredients.isEmpty(),
+                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+            ) {
+                Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
+            }
+        } else if (ingredients.isEmpty()) {
             Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
         }
 
-        AnimatedVisibility(
-            visible = ingredients.isNotEmpty(),
-            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
-            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-        ) {
+        if (animationsEnabled) {
+            AnimatedVisibility(
+                visible = ingredients.isNotEmpty(),
+                enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+                exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+            ) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    orderedCategories.forEach { category ->
+                        val categoryIngredients = groupedIngredients[category].orEmpty()
+                        if (categoryIngredients.isNotEmpty()) {
+                            item(key = "category-$category") {
+                                CategorySection(
+                                    category = category,
+                                    ingredients = categoryIngredients,
+                                    purchasedIngredientKeys = purchasedIngredientKeys,
+                                    onIngredientPurchasedChange = onIngredientPurchasedChange,
+                                    onRemoveIngredient = onRemoveIngredient
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (ingredients.isNotEmpty()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)

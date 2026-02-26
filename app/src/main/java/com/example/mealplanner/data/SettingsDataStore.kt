@@ -30,7 +30,8 @@ class SettingsDataStore(private val context: Context) {
                 ?: AccentPalette.EMERALD,
             densityMode = preferences[Keys.DENSITY_MODE]
                 ?.let { raw -> runCatching { DensityMode.valueOf(raw) }.getOrNull() }
-                ?: DensityMode.NORMAL
+                ?: DensityMode.NORMAL,
+            animationsEnabled = preferences[Keys.ANIMATIONS_ENABLED] ?: true
         )
     }
 
@@ -64,11 +65,18 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun setAnimationsEnabled(value: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.ANIMATIONS_ENABLED] = value
+        }
+    }
+
     private object Keys {
         val PERSIST_DATA_BETWEEN_LAUNCHES = booleanPreferencesKey("persist_data_between_launches")
         val CLEAR_SHOPPING_AFTER_EXPORT = booleanPreferencesKey("clear_shopping_after_export")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ACCENT_PALETTE = stringPreferencesKey("accent_palette")
         val DENSITY_MODE = stringPreferencesKey("density_mode")
+        val ANIMATIONS_ENABLED = booleanPreferencesKey("animations_enabled")
     }
 }
