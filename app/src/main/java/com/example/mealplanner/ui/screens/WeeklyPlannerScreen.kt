@@ -1,5 +1,11 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +34,7 @@ import com.example.mealplanner.model.Meal
 import com.example.mealplanner.model.MealSlot
 import com.example.mealplanner.model.PlanDay
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WeeklyPlannerScreen(
     meals: List<Meal>,
@@ -40,8 +47,16 @@ fun WeeklyPlannerScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(PlanDay.entries) { day ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+        items(
+            items = PlanDay.entries.toList(),
+            key = { day -> day.name }
+        ) { day ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // animateItemPlacement resolves from LazyItemScope in the items block.
+                    .animateItemPlacement()
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -74,8 +89,6 @@ private fun MealSelectorRow(
     onAssign: (String?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = mealOptions.firstOrNull { it.id == selectedMealId }?.name
-        ?: "Не выбрано"
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -86,15 +99,25 @@ private fun MealSelectorRow(
             onExpandedChange = { expanded = !expanded },
             modifier = Modifier.weight(1f)
         ) {
-            OutlinedTextField(
-                value = selectedName,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text(slot.title) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
-            )
+            AnimatedContent(
+                targetState = selectedMealId,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(180)) togetherWith fadeOut(animationSpec = tween(120))
+                },
+                label = "meal_selection"
+            ) { targetMealId ->
+                val selectedName = mealOptions.firstOrNull { it.id == targetMealId }?.name
+                    ?: "Не выбрано"
+                OutlinedTextField(
+                    value = selectedName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(slot.title) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+            }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
