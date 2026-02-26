@@ -1,11 +1,12 @@
 package com.example.mealplanner.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,13 +29,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShoppingListScreen(
     ingredients: List<Ingredient>,
+    categoriesByStorageKey: Map<String, String>,
     dayCount: Int,
     purchasedIngredientKeys: Set<String>,
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
@@ -45,6 +50,15 @@ fun ShoppingListScreen(
     onSavePdf: () -> Unit
 ) {
     val showSendOptions = remember { mutableStateOf(false) }
+    val groupedIngredients = remember(ingredients, categoriesByStorageKey) {
+        ingredients.groupBy { ingredient ->
+            categoriesByStorageKey[ingredient.storageKey()] ?: DEFAULT_CATEGORY
+        }
+    }
+    val orderedCategories = remember(groupedIngredients) {
+        groupedIngredients.keys
+            .sortedWith(compareBy<String> { it == DEFAULT_CATEGORY }.thenBy { it.lowercase(Locale.getDefault()) })
+    }
 
     Column(
         modifier = Modifier
@@ -81,33 +95,52 @@ fun ShoppingListScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(ingredients, key = { it.storageKey() }) { ingredient ->
-                    val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
+                orderedCategories.forEach { category ->
+                    val categoryIngredients = groupedIngredients[category].orEmpty()
+                    if (categoryIngredients.isNotEmpty()) {
+                        stickyHeader(key = "header-$category") {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                tonalElevation = 2.dp
+                            ) {
+                                Text(
+                                    text = category,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
 
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isPurchased,
-                                onCheckedChange = { checked ->
-                                    onIngredientPurchasedChange(ingredient, checked)
-                                }
-                            )
-                            Text(
-                                text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit}",
+                        items(categoryIngredients, key = { it.storageKey() }) { ingredient ->
+                            val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
+                            Card(
                                 modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .weight(1f)
-                            )
-                            IconButton(onClick = { onRemoveIngredient(ingredient) }) {
-                                Text("🗑️")
+                                    .fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isPurchased,
+                                        onCheckedChange = { checked ->
+                                            onIngredientPurchasedChange(ingredient, checked)
+                                        }
+                                    )
+                                    Text(
+                                        text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit}",
+                                        modifier = Modifier
+                                            .padding(start = 8.dp)
+                                            .weight(1f)
+                                    )
+                                    IconButton(onClick = { onRemoveIngredient(ingredient) }) {
+                                        Text("🗑️")
+                                    }
+                                }
                             }
                         }
                     }
@@ -167,3 +200,5 @@ fun ShoppingListScreen(
 private fun Ingredient.storageKey(): String {
     return "${name.trim().lowercase(Locale.getDefault())}|${unit.trim().lowercase(Locale.getDefault())}"
 }
+
+private const val DEFAULT_CATEGORY = "Other"
