@@ -83,6 +83,39 @@ class MealsRepository(context: Context) {
         }
     }
 
+
+
+    suspend fun buildDatabaseExportPayload(): DatabaseExportPayload = withContext(Dispatchers.IO) {
+        val meals = mealDao.getAllMealsOnce()
+        val ingredients = ingredientDao.getAllOnce()
+        val crossRefs = mealDao.getAllCrossRefsOnce()
+        val plannerState = plannerStateDao.getById()
+
+        val parsedGroups = plannerState?.groupsJson?.let { groupsJson ->
+            gson.fromJson<List<String>>(groupsJson, object : TypeToken<List<String>>() {}.type)
+        } ?: DEFAULT_GROUPS
+
+        val parsedPurchased = plannerState?.purchasedIngredientKeysJson?.let { purchasedJson ->
+            gson.fromJson<List<String>>(purchasedJson, object : TypeToken<List<String>>() {}.type)
+        } ?: emptyList()
+
+        val parsedWeeklyPlan = plannerState?.weeklyPlanJson?.let { weeklyPlanJson ->
+            gson.fromJson<List<WeeklyPlanAssignment>>(weeklyPlanJson, object : TypeToken<List<WeeklyPlanAssignment>>() {}.type)
+        } ?: emptyList()
+
+        DatabaseExportPayload(
+            meals = meals,
+            ingredients = ingredients,
+            crossRefs = crossRefs,
+            planner = PlannerExportPayload(
+                purchasedIngredientKeys = parsedPurchased,
+                weeklyPlan = parsedWeeklyPlan,
+                dayCount = plannerState?.dayCount?.coerceIn(1, 30) ?: 1
+            ),
+            groups = normalizeGroups(parsedGroups)
+        )
+    }
+
     suspend fun saveState(state: PlannerState) = withContext(Dispatchers.IO) {
         val entity = PlannerStateEntity(
             mealsJson = "[]",
@@ -247,6 +280,20 @@ class MealsRepository(context: Context) {
         val DEFAULT_GROUPS = listOf("Завтрак", "Перекус", "Обед", "Ужин", "Десерт")
     }
 }
+
+data class PlannerExportPayload(
+    val purchasedIngredientKeys: List<String>,
+    val weeklyPlan: List<WeeklyPlanAssignment>,
+    val dayCount: Int
+)
+
+data class DatabaseExportPayload(
+    val meals: List<com.example.mealplanner.data.local.Meal>,
+    val ingredients: List<com.example.mealplanner.data.local.Ingredient>,
+    val crossRefs: List<MealIngredientCrossRef>,
+    val planner: PlannerExportPayload,
+    val groups: List<String>
+)
 
 data class PlannerState(
     val meals: List<Meal> = emptyList(),

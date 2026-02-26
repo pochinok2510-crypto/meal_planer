@@ -19,6 +19,9 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredients ORDER BY name COLLATE NOCASE ASC")
     fun getAll(): Flow<List<Ingredient>>
 
+    @Query("SELECT * FROM ingredients ORDER BY name COLLATE NOCASE ASC")
+    suspend fun getAllOnce(): List<Ingredient>
+
     @Query("SELECT * FROM ingredients WHERE LOWER(name) = LOWER(:name) LIMIT 1")
     suspend fun findByName(name: String): Ingredient?
 

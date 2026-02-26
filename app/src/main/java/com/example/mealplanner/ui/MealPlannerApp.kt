@@ -86,6 +86,21 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         ).show()
     }
 
+
+    val saveDatabaseExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        viewModel.exportDatabaseToUri(uri) { saved ->
+            Toast.makeText(
+                context,
+                if (saved) "База данных экспортирована" else "Не удалось экспортировать базу данных",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
 
     Scaffold(
@@ -216,7 +231,10 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     settings = settings,
                     onBack = { navController.popBackStack() },
                     onPersistDataToggle = viewModel::updatePersistDataBetweenLaunches,
-                    onClearAfterExportToggle = viewModel::updateClearShoppingAfterExport
+                    onClearAfterExportToggle = viewModel::updateClearShoppingAfterExport,
+                    onExportDatabase = {
+                        saveDatabaseExportLauncher.launch("meal-planner-export-${System.currentTimeMillis()}.json")
+                    }
                 )
             }
         }

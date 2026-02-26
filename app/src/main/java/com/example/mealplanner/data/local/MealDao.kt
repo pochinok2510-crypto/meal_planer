@@ -51,6 +51,9 @@ interface MealDao {
 
     @Query("SELECT * FROM meal_ingredient_cross_ref WHERE mealId = :mealId")
     suspend fun getCrossRefsForMeal(mealId: Long): List<MealIngredientCrossRef>
+
+    @Query("SELECT * FROM meal_ingredient_cross_ref")
+    suspend fun getAllCrossRefsOnce(): List<MealIngredientCrossRef>
 }
 
 data class MealIngredientRow(
