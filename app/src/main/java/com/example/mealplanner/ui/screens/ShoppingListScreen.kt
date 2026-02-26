@@ -1,4 +1,5 @@
 package com.example.mealplanner.ui.screens
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -86,6 +87,9 @@ fun ShoppingListScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+
+                            // animateItemPlacement resolves from LazyItemScope in the items block.
+
                             .animateItemPlacement()
                     ) {
                         Row(

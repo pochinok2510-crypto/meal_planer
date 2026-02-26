@@ -1,4 +1,5 @@
 package com.example.mealplanner.ui.screens
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -54,6 +55,9 @@ fun WeeklyPlannerScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+
+                    // animateItemPlacement resolves from LazyItemScope in the items block.
+
                     .animateItemPlacement()
             ) {
                 Column(

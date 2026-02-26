@@ -214,6 +214,9 @@ fun AddMealScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
+
+                                        // animateItemPlacement is available in LazyItemScope; no explicit lazy import is required.
+
                                         .animateItemPlacement()
                                 ) {
                                     Row(
