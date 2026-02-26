@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mealplanner.data.IngredientRepository
 import com.example.mealplanner.data.local.Ingredient
+import com.example.mealplanner.data.local.IngredientGroup
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -17,14 +18,16 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
     val ingredients: StateFlow<List<Ingredient>> = repository.getAllIngredients()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val groups: StateFlow<List<IngredientGroup>> = repository.getAllGroups()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val ingredientNames: StateFlow<Set<String>> = ingredients
         .map { items -> items.map { it.name.lowercase() }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
-    fun addIngredient(name: String, unit: String, category: String? = null) {
+    fun addIngredient(name: String, unit: String, groupId: String) {
         val normalizedName = name.trim()
         val normalizedUnit = unit.trim()
-        val normalizedCategory = category?.trim()?.takeIf { it.isNotEmpty() }
         if (normalizedName.isBlank() || normalizedUnit.isBlank()) return
 
         viewModelScope.launch {
@@ -32,7 +35,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
                 Ingredient(
                     name = normalizedName,
                     unit = normalizedUnit,
-                    category = normalizedCategory
+                    groupId = groupId
                 )
             )
         }

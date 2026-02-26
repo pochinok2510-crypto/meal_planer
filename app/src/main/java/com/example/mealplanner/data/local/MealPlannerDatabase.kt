@@ -12,15 +12,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         PlannerStateEntity::class,
         Ingredient::class,
+        IngredientGroup::class,
         Meal::class,
         MealIngredientCrossRef::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class MealPlannerDatabase : RoomDatabase() {
     abstract fun plannerStateDao(): PlannerStateDao
     abstract fun ingredientDao(): IngredientDao
+    abstract fun ingredientGroupDao(): IngredientGroupDao
     abstract fun mealDao(): MealDao
 
     companion object {
@@ -125,6 +127,52 @@ abstract class MealPlannerDatabase : RoomDatabase() {
             }
         }
 
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS ingredient_groups (
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_ingredient_groups_name ON ingredient_groups(name)"
+                )
+
+                val defaultGroupId = java.util.UUID.randomUUID().toString()
+                db.execSQL(
+                    "INSERT OR IGNORE INTO ingredient_groups(id, name) VALUES('$defaultGroupId', 'Other')"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS ingredients_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        unit TEXT NOT NULL,
+                        groupId TEXT NOT NULL,
+                        FOREIGN KEY(groupId) REFERENCES ingredient_groups(id) ON UPDATE CASCADE ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO ingredients_new(id, name, unit, groupId)
+                    SELECT id, name, unit, '$defaultGroupId'
+                    FROM ingredients
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE ingredients")
+                db.execSQL("ALTER TABLE ingredients_new RENAME TO ingredients")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_ingredients_name ON ingredients(name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_ingredients_groupId ON ingredients(groupId)")
+            }
+        }
+
         private fun SupportSQLiteDatabase.hasColumn(tableName: String, columnName: String): Boolean {
             query(SimpleSQLiteQuery("PRAGMA table_info($tableName)")).use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")
@@ -144,7 +192,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
                     MealPlannerDatabase::class.java,
                     "meal_planner.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { INSTANCE = it }
             }
