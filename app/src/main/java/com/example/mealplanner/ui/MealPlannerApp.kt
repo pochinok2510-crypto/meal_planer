@@ -13,11 +13,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +51,24 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
     val addMealState by viewModel.addMealUiState.collectAsState()
     val groupedFilteredIngredientCatalog by viewModel.groupedFilteredIngredientCatalog.collectAsState()
+    val undoUiState by viewModel.undoUiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(undoUiState?.id) {
+        val currentUndoState = undoUiState ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = currentUndoState.message,
+            actionLabel = currentUndoState.actionLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Short
+        )
+
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            viewModel.undoLastRemoval()
+        } else {
+            viewModel.dismissUndoState()
+        }
+    }
 
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
@@ -64,6 +86,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
             TopAppBar(title = {
@@ -165,6 +188,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     dayCount = dayCount,
                     purchasedIngredientKeys = purchasedIngredientKeys,
                     onIngredientPurchasedChange = viewModel::setIngredientPurchased,
+                    onRemoveIngredient = viewModel::removeShoppingIngredient,
                     onBack = { navController.popBackStack() },
                     onClear = viewModel::clearShoppingSelection,
                     onDayCountChange = viewModel::updateDayCount,

@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +37,7 @@ fun ShoppingListScreen(
     dayCount: Int,
     purchasedIngredientKeys: Set<String>,
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
+    onRemoveIngredient: (Ingredient) -> Unit,
     onBack: () -> Unit,
     onClear: () -> Unit,
     onDayCountChange: (Int) -> Unit,
@@ -100,8 +102,13 @@ fun ShoppingListScreen(
                             )
                             Text(
                                 text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit}",
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .weight(1f)
                             )
+                            IconButton(onClick = { onRemoveIngredient(ingredient) }) {
+                                Text("🗑️")
+                            }
                         }
                     }
                 }
