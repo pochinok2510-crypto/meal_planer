@@ -62,6 +62,18 @@ data class UndoUiState(
     val actionLabel: String = "Отменить"
 )
 
+data class MealFilterState(
+    val selectedGroup: String? = null,
+    val selectedIngredient: String? = null,
+    val selectedCategory: String? = null
+)
+
+data class MealFilterOptions(
+    val groups: List<String> = emptyList(),
+    val ingredients: List<String> = emptyList(),
+    val categories: List<String> = emptyList()
+)
+
 private sealed interface PendingUndoAction {
     data class DraftIngredientRemoval(
         val ingredient: MealIngredientDraft,
@@ -93,6 +105,9 @@ class MealPlannerViewModel(
 
     private val _groups = MutableStateFlow(MealsRepository.DEFAULT_GROUPS)
     val groups: StateFlow<List<String>> = _groups.asStateFlow()
+
+    private val _mealFilters = MutableStateFlow(MealFilterState())
+    val mealFilters: StateFlow<MealFilterState> = _mealFilters.asStateFlow()
 
     private val _weeklyPlan = MutableStateFlow(emptyMap<Pair<PlanDay, MealSlot>, String>())
     val weeklyPlan: StateFlow<Map<Pair<PlanDay, MealSlot>, String>> = _weeklyPlan.asStateFlow()
@@ -171,6 +186,57 @@ class MealPlannerViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    val menuMealFilterOptions = combine(_meals, _groups, ingredientCatalog) { meals, groups, catalog ->
+        val categoryByIngredientName = catalog
+            .associate { ingredient ->
+                ingredient.name.normalizedKey() to
+                    (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+            }
+
+        val ingredients = meals
+            .flatMap { meal -> meal.ingredients.map { ingredient -> ingredient.name.trim() } }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.normalizedKey() }
+            .sortedBy { it.lowercase(Locale.getDefault()) }
+
+        val categories = meals
+            .flatMap { meal -> meal.ingredients }
+            .map { ingredient ->
+                categoryByIngredientName[ingredient.name.normalizedKey()] ?: OTHER_INGREDIENT_CATEGORY
+            }
+            .distinct()
+            .sortedBy { it.lowercase(Locale.getDefault()) }
+
+        MealFilterOptions(
+            groups = groups,
+            ingredients = ingredients,
+            categories = categories
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealFilterOptions())
+
+    val filteredMeals = combine(_meals, _mealFilters, ingredientCatalog) { meals, filters, catalog ->
+        val categoryByIngredientName = catalog
+            .associate { ingredient ->
+                ingredient.name.normalizedKey() to
+                    (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+            }
+
+        meals.filter { meal ->
+            val matchesGroup = filters.selectedGroup.isNullOrBlank() || meal.group == filters.selectedGroup
+
+            val normalizedIngredientFilter = filters.selectedIngredient?.normalizedKey()
+            val matchesIngredient = normalizedIngredientFilter.isNullOrBlank() || meal.ingredients.any { ingredient ->
+                ingredient.name.normalizedKey() == normalizedIngredientFilter
+            }
+
+            val matchesCategory = filters.selectedCategory.isNullOrBlank() || meal.ingredients.any { ingredient ->
+                categoryByIngredientName[ingredient.name.normalizedKey()] == filters.selectedCategory
+            }
+
+            matchesGroup && matchesIngredient && matchesCategory
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
         observeMeals()
         observeSettings()
@@ -234,6 +300,26 @@ class MealPlannerViewModel(
             }
         }
         persistPlannerStateIfEnabled()
+
+        if (_mealFilters.value.selectedGroup == name) {
+            _mealFilters.update { it.copy(selectedGroup = null) }
+        }
+    }
+
+    fun updateMealFilterGroup(group: String?) {
+        _mealFilters.update { current -> current.copy(selectedGroup = group?.trim()?.takeIf { it.isNotEmpty() }) }
+    }
+
+    fun updateMealFilterIngredient(ingredient: String?) {
+        _mealFilters.update { current -> current.copy(selectedIngredient = ingredient?.trim()?.takeIf { it.isNotEmpty() }) }
+    }
+
+    fun updateMealFilterCategory(category: String?) {
+        _mealFilters.update { current -> current.copy(selectedCategory = category?.trim()?.takeIf { it.isNotEmpty() }) }
+    }
+
+    fun clearMealFilters() {
+        _mealFilters.value = MealFilterState()
     }
 
     fun renameGroup(oldName: String, newName: String): Boolean {
