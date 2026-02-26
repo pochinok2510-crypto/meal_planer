@@ -136,6 +136,9 @@ class MealPlannerViewModel(
     val ingredientCatalog = ingredientRepository.getAllIngredients()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val ingredientGroups = ingredientRepository.getAllGroups()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _addMealUiState = MutableStateFlow(
         AddMealUiState(
             mealName = savedStateHandle[KEY_MEAL_NAME] ?: "",
@@ -169,32 +172,32 @@ class MealPlannerViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val groupedFilteredIngredientCatalog = filteredIngredientCatalog
-        .map { catalog ->
-            val grouped = catalog.groupBy { ingredient ->
-                ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY
-            }
-
-            val orderedCategories = grouped.keys
-                .filterNot { it == OTHER_INGREDIENT_CATEGORY }
-                .sorted()
-
-            buildMap {
-                orderedCategories.forEach { category ->
-                    put(category, grouped.getValue(category))
-                }
-                grouped[OTHER_INGREDIENT_CATEGORY]?.let { otherIngredients ->
-                    put(OTHER_INGREDIENT_CATEGORY, otherIngredients)
-                }
-            }
+    val groupedFilteredIngredientCatalog = combine(filteredIngredientCatalog, ingredientGroups) { catalog, groups ->
+        val groupNameById = groups.associate { it.id to it.name }
+        val grouped = catalog.groupBy { ingredient ->
+            groupNameById[ingredient.groupId] ?: IngredientRepository.DEFAULT_GROUP_NAME
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    val menuMealFilterOptions = combine(_meals, _groups, ingredientCatalog) { meals, groups, catalog ->
+        val orderedCategories = grouped.keys
+            .filterNot { it.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }
+            .sortedBy { it.lowercase(Locale.getDefault()) }
+
+        buildMap {
+            orderedCategories.forEach { category ->
+                put(category, grouped.getValue(category))
+            }
+            grouped.entries.firstOrNull { it.key.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }
+                ?.value
+                ?.let { otherIngredients -> put(IngredientRepository.DEFAULT_GROUP_NAME, otherIngredients) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val menuMealFilterOptions = combine(_meals, _groups, ingredientCatalog, ingredientGroups) { meals, groups, catalog, ingredientGroups ->
+        val groupNameById = ingredientGroups.associate { it.id to it.name }
         val categoryByIngredientName = catalog
             .associate { ingredient ->
                 ingredient.name.normalizedKey() to
-                    (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+                    (groupNameById[ingredient.groupId] ?: IngredientRepository.DEFAULT_GROUP_NAME)
             }
 
         val ingredients = meals
@@ -206,7 +209,7 @@ class MealPlannerViewModel(
         val categories = meals
             .flatMap { meal -> meal.ingredients }
             .map { ingredient ->
-                categoryByIngredientName[ingredient.name.normalizedKey()] ?: OTHER_INGREDIENT_CATEGORY
+                categoryByIngredientName[ingredient.name.normalizedKey()] ?: IngredientRepository.DEFAULT_GROUP_NAME
             }
             .distinct()
             .sortedBy { it.lowercase(Locale.getDefault()) }
@@ -218,11 +221,12 @@ class MealPlannerViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealFilterOptions())
 
-    val filteredMeals = combine(_meals, _mealFilters, ingredientCatalog) { meals, filters, catalog ->
+    val filteredMeals = combine(_meals, _mealFilters, ingredientCatalog, ingredientGroups) { meals, filters, catalog, ingredientGroups ->
+        val groupNameById = ingredientGroups.associate { it.id to it.name }
         val categoryByIngredientName = catalog
             .associate { ingredient ->
                 ingredient.name.normalizedKey() to
-                    (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+                    (groupNameById[ingredient.groupId] ?: IngredientRepository.DEFAULT_GROUP_NAME)
             }
 
         meals.filter { meal ->
@@ -242,6 +246,7 @@ class MealPlannerViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
+        viewModelScope.launch { ingredientRepository.ensureDefaultGroup() }
         observeMeals()
         observeSettings()
     }
@@ -401,6 +406,21 @@ class MealPlannerViewModel(
         }
     }
 
+    fun createIngredientGroup(name: String): Boolean {
+        val normalized = name.trim()
+        if (normalized.isBlank()) return false
+        viewModelScope.launch { ingredientRepository.createGroup(normalized) }
+        return true
+    }
+
+    fun deleteIngredientGroup(groupId: String) {
+        viewModelScope.launch { ingredientRepository.deleteGroup(groupId) }
+    }
+
+    fun deleteCatalogIngredient(ingredientId: Long) {
+        viewModelScope.launch { ingredientRepository.deleteById(ingredientId) }
+    }
+
     fun updateIngredientSearchQuery(value: String) {
         val normalizedQuery = value.trim()
         val match = ingredientCatalog.value.firstOrNull { ingredient ->
@@ -444,7 +464,8 @@ class MealPlannerViewModel(
         val added = addIngredientToMealDraft(
             nameInput = state.ingredientSearchQuery,
             unitInput = state.ingredientUnitInput,
-            quantityInput = state.ingredientQuantityInput
+            quantityInput = state.ingredientQuantityInput,
+            groupId = ""
         )
         if (added) {
             closeIngredientSheet()
@@ -452,7 +473,7 @@ class MealPlannerViewModel(
         return added
     }
 
-    fun addIngredientToMealDraft(nameInput: String, unitInput: String, quantityInput: String): Boolean {
+    fun addIngredientToMealDraft(nameInput: String, unitInput: String, quantityInput: String, groupId: String): Boolean {
         val normalizedName = nameInput.trim()
         val quantity = quantityInput.trim().toDoubleOrNull()
         val existingIngredient = ingredientCatalog.value.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
@@ -474,10 +495,12 @@ class MealPlannerViewModel(
             else -> {
                 if (existingIngredient == null) {
                     viewModelScope.launch {
+                        val defaultGroupId = ingredientRepository.ensureDefaultGroup().id
                         ingredientRepository.insertOrIgnore(
                             com.example.mealplanner.data.local.Ingredient(
                                 name = normalizedName,
-                                unit = normalizedUnit
+                                unit = normalizedUnit,
+                                groupId = groupId.ifBlank { defaultGroupId }
                             )
                         )
                     }
@@ -782,13 +805,13 @@ class MealPlannerViewModel(
     fun getShoppingIngredientCategoriesByStorageKey(): Map<String, String> {
         val categoriesByPair = ingredientCatalog.value.associate { ingredient ->
             (ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()) to
-                (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+                (IngredientRepository.DEFAULT_GROUP_NAME)
         }
 
         return getAggregatedShoppingList().associate { ingredient ->
             val key = ingredient.storageKey()
             val category = categoriesByPair[ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()]
-                ?: OTHER_INGREDIENT_CATEGORY
+                ?: IngredientRepository.DEFAULT_GROUP_NAME
             key to category
         }
     }
@@ -1019,8 +1042,6 @@ class MealPlannerViewModel(
     }
 
     companion object {
-        private const val OTHER_INGREDIENT_CATEGORY = "Other"
-
         private val SMART_DEFAULT_PCS_KEYWORDS = listOf("egg", "eggs", "яйц")
         private val SMART_DEFAULT_ML_KEYWORDS = listOf("milk", "молок")
         private val SMART_DEFAULT_GRAMS_KEYWORDS = listOf("flour", "мук")

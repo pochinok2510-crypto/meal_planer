@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.example.mealplanner.data.local.IngredientDao
+import com.example.mealplanner.data.local.IngredientGroupDao
 import com.example.mealplanner.data.local.MealIngredientCrossRef
 import com.example.mealplanner.data.local.MealIngredientRow
 import com.example.mealplanner.data.local.MealPlannerDatabase
@@ -28,6 +29,7 @@ class MealsRepository(context: Context) {
     private val db = MealPlannerDatabase.getInstance(context)
     private val mealDao = db.mealDao()
     private val ingredientDao: IngredientDao = db.ingredientDao()
+    private val ingredientGroupDao: IngredientGroupDao = db.ingredientGroupDao()
     private val plannerStateDao = db.plannerStateDao()
     private val sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
@@ -325,10 +327,22 @@ class MealsRepository(context: Context) {
         val existing = ingredientDao.findByName(name)
         if (existing != null) return existing.id
         val inserted = ingredientDao.insertOrIgnoreByNameCaseInsensitive(
-            com.example.mealplanner.data.local.Ingredient(name = name, unit = unit)
+            com.example.mealplanner.data.local.Ingredient(name = name, unit = unit, groupId = ensureDefaultIngredientGroupId())
         )
         if (inserted > 0L) return inserted
         return ingredientDao.findByName(name)?.id ?: throw IllegalStateException("Cannot resolve ingredient id for $name")
+    }
+
+    private suspend fun ensureDefaultIngredientGroupId(): String {
+        val existing = ingredientGroupDao.findByName(IngredientRepository.DEFAULT_GROUP_NAME)
+        if (existing != null) return existing.id
+
+        val created = com.example.mealplanner.data.local.IngredientGroup(
+            id = UUID.randomUUID().toString(),
+            name = IngredientRepository.DEFAULT_GROUP_NAME
+        )
+        ingredientGroupDao.insert(created)
+        return created.id
     }
 
     private fun parseImportPayload(rawJson: String): DatabaseExportPayload {

@@ -25,6 +25,12 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredients WHERE LOWER(name) = LOWER(:name) LIMIT 1")
     suspend fun findByName(name: String): Ingredient?
 
+    @Query("DELETE FROM ingredients WHERE id = :ingredientId")
+    suspend fun deleteById(ingredientId: Long)
+
+    @Query("UPDATE ingredients SET groupId = :targetGroupId WHERE groupId = :sourceGroupId")
+    suspend fun moveGroupIngredients(sourceGroupId: String, targetGroupId: String)
+
     @Delete
     suspend fun delete(ingredient: Ingredient)
 
