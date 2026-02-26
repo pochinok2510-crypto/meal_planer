@@ -306,7 +306,7 @@ fun AddMealScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DraftIngredientCard(
-    item: com.example.mealplanner.viewmodel.DraftIngredientItem,
+    item: com.example.mealplanner.viewmodel.MealIngredientDraft,
     selectedCount: Int,
     dragListState: androidx.compose.foundation.lazy.LazyListState,
     index: Int,
