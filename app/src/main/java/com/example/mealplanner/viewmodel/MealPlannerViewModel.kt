@@ -74,15 +74,6 @@ private sealed interface PendingUndoAction {
     ) : PendingUndoAction
 }
 
-private fun List<MealIngredientDraft>.sortedAlphabetically(): List<MealIngredientDraft> {
-    return sortedWith(
-        compareBy<MealIngredientDraft>(
-            { it.name.lowercase(Locale.getDefault()) },
-            { it.unit.lowercase(Locale.getDefault()) }
-        )
-    )
-}
-
 enum class AddMealStep {
     BASIC_INFO,
     INGREDIENTS
@@ -422,12 +413,26 @@ class MealPlannerViewModel(
                     }
 
                     current.copy(
-                        selectedIngredients = updated.sortedAlphabetically(),
+                        selectedIngredients = updated,
                         error = null
                     )
                 }
                 return true
             }
+        }
+    }
+
+    fun reorderDraftIngredient(fromIndex: Int, toIndex: Int) {
+        updateAddMealState { state ->
+            val items = state.selectedIngredients
+            if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) {
+                return@updateAddMealState state
+            }
+            val reordered = items.toMutableList().apply {
+                val moved = removeAt(fromIndex)
+                add(toIndex, moved)
+            }
+            state.copy(selectedIngredients = reordered, error = null)
         }
     }
 
@@ -872,7 +877,7 @@ class MealPlannerViewModel(
                     unit = obj.optString("unit"),
                     quantityInput = obj.optString("quantityInput")
                 )
-            }.sortedAlphabetically()
+            }
         }.getOrDefault(emptyList())
     }
 

@@ -168,6 +168,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onConfirmIngredient = { viewModel.confirmIngredientFromSheet() },
                     onEditDraftIngredient = viewModel::editDraftIngredient,
                     onRemoveDraftIngredient = viewModel::removeDraftIngredient,
+                    onReorderDraftIngredient = viewModel::reorderDraftIngredient,
                     onSaveMeal = {
                         viewModel.saveMealFromDraft {
                             navController.popBackStack()
