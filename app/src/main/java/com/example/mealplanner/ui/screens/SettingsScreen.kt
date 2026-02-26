@@ -37,6 +37,7 @@ fun SettingsScreen(
     onThemeModeSelect: (AppThemeMode) -> Unit,
     onAccentPaletteSelect: (AccentPalette) -> Unit,
     onDensityModeSelect: (DensityMode) -> Unit,
+    onAnimationsToggle: (Boolean) -> Unit,
     onExportDatabase: () -> Unit,
     onImportDatabaseMerge: () -> Unit,
     onImportDatabaseOverwrite: () -> Unit
@@ -174,6 +175,14 @@ fun SettingsScreen(
             DensityOptionRow("Нормальная", settings.densityMode == DensityMode.NORMAL) {
                 onDensityModeSelect(DensityMode.NORMAL)
             }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Анимации интерфейса", modifier = Modifier.weight(1f))
+            Switch(
+                checked = settings.animationsEnabled,
+                onCheckedChange = onAnimationsToggle
+            )
         }
 
         SettingsSectionCard(minCardHeight = minCardHeight) {

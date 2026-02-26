@@ -61,6 +61,7 @@ fun MenuScreen(
     groups: List<String>,
     mealFilterState: MealFilterState,
     mealFilterOptions: MealFilterOptions,
+    animationsEnabled: Boolean,
     onRemoveMeal: (Meal) -> Unit,
     onMoveMealToGroup: (Meal, String) -> Unit,
     onDuplicateMealToGroup: (Meal, String) -> Unit,
@@ -200,7 +201,19 @@ fun MenuScreen(
                     }
 
                     items(mealsInGroup, key = { it.id }) { meal ->
-                        AnimatedVisibility(visible = isExpanded) {
+                        if (animationsEnabled) {
+                            AnimatedVisibility(visible = isExpanded) {
+                                MealCard(
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    meal = meal,
+                                    groups = groups,
+                                    searchQuery = normalizedSearch,
+                                    onRemove = { onRemoveMeal(meal) },
+                                    onMove = { target -> onMoveMealToGroup(meal, target) },
+                                    onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
+                                )
+                            }
+                        } else if (isExpanded) {
                             MealCard(
                                 modifier = Modifier.padding(start = 12.dp),
                                 meal = meal,

@@ -37,4 +37,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             settingsDataStore.setDensityMode(mode)
         }
     }
+
+    fun updateAnimationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setAnimationsEnabled(enabled)
+        }
+    }
 }

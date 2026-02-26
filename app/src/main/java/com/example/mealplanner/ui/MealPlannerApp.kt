@@ -180,6 +180,7 @@ fun MealPlannerApp(
                     groups = groups,
                     mealFilterState = mealFilters,
                     mealFilterOptions = mealFilterOptions,
+                    animationsEnabled = settings.animationsEnabled,
                     onRemoveMeal = mealPlannerViewModel::removeMeal,
                     onMoveMealToGroup = mealPlannerViewModel::moveMealToGroup,
                     onDuplicateMealToGroup = mealPlannerViewModel::duplicateMealToGroup,
@@ -203,6 +204,7 @@ fun MealPlannerApp(
                     groups = groups,
                     groupedFilteredIngredients = groupedFilteredIngredientCatalog,
                     state = addMealState,
+                    animationsEnabled = settings.animationsEnabled,
                     onBack = { navController.popBackStack() },
                     onMealNameChange = mealPlannerViewModel::updateAddMealName,
                     onGroupSelect = mealPlannerViewModel::updateAddMealGroup,
@@ -237,6 +239,7 @@ fun MealPlannerApp(
                     ingredients = mealPlannerViewModel.getAggregatedShoppingList(),
                     categoriesByStorageKey = mealPlannerViewModel.getShoppingIngredientCategoriesByStorageKey(),
                     dayCount = dayCount,
+                    animationsEnabled = settings.animationsEnabled,
                     purchasedIngredientKeys = purchasedIngredientKeys,
                     onIngredientPurchasedChange = mealPlannerViewModel::setIngredientPurchased,
                     onRemoveIngredient = mealPlannerViewModel::removeShoppingIngredient,
@@ -260,6 +263,7 @@ fun MealPlannerApp(
                     onThemeModeSelect = appViewModel::updateThemeMode,
                     onAccentPaletteSelect = appViewModel::updateAccentPalette,
                     onDensityModeSelect = appViewModel::updateDensityMode,
+                    onAnimationsToggle = appViewModel::updateAnimationsEnabled,
                     onExportDatabase = {
                         saveDatabaseExportLauncher.launch("meal-planner-export-${System.currentTimeMillis()}.json")
                     },
