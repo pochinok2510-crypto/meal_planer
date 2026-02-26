@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -54,7 +55,9 @@ fun WeeklyPlannerScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+
                     // animateItemPlacement resolves from LazyItemScope in the items block.
+
                     .animateItemPlacement()
             ) {
                 Column(
