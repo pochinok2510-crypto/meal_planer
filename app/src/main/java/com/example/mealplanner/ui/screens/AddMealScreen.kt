@@ -9,6 +9,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,9 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.IconButton
@@ -39,7 +42,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
@@ -74,15 +76,13 @@ fun AddMealScreen(
     onConfirmIngredient: () -> Unit,
     onEditDraftIngredient: (String) -> Unit,
     onRemoveDraftIngredient: (String) -> Unit,
+    onReorderDraftIngredient: (Int, Int) -> Unit,
     onSaveMeal: () -> Unit
 ) {
     var groupMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var mealTypeMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var removingIngredientIds by remember { mutableStateOf(setOf<String>()) }
 
-    val selectedIngredientsListState = rememberSaveable(saver = lazyListStateSaver()) {
-        LazyListState()
-    }
     val tabs = listOf(AddMealStep.BASIC_INFO to "Шаг 1: Основное", AddMealStep.INGREDIENTS to "Шаг 2: Ингредиенты")
 
     Column(
@@ -186,17 +186,20 @@ fun AddMealScreen(
                 }
 
                 if (state.selectedIngredients.isNotEmpty()) {
+                    val dragListState = rememberLazyListState()
+                    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                        state = selectedIngredientsListState,
+                        state = dragListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(
+                        itemsIndexed(
                             items = state.selectedIngredients,
-                            key = { item -> item.id }
-                        ) { item ->
+                            key = { _, item -> item.id }
+                        ) { index, item ->
 
                             val visibilityState = remember(item.id) {
                                 MutableTransitionState(false).apply { targetState = true }
@@ -214,6 +217,40 @@ fun AddMealScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .pointerInput(state.selectedIngredients.size) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    draggingIndex = index
+                                                },
+                                                onDragEnd = {
+                                                    draggingIndex = null
+                                                },
+                                                onDragCancel = {
+                                                    draggingIndex = null
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    if (dragAmount.y == 0f) return@detectDragGesturesAfterLongPress
+
+                                                    val currentIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                                    val currentItem = dragListState.layoutInfo.visibleItemsInfo
+                                                        .firstOrNull { it.index == currentIndex }
+                                                        ?: return@detectDragGesturesAfterLongPress
+
+                                                    val currentCenter = currentItem.offset + (currentItem.size / 2) + dragAmount.y
+                                                    val target = dragListState.layoutInfo.visibleItemsInfo
+                                                        .firstOrNull { info ->
+                                                            currentCenter.toInt() in info.offset..(info.offset + info.size)
+                                                        }
+                                                        ?: return@detectDragGesturesAfterLongPress
+
+                                                    if (target.index != currentIndex) {
+                                                        onReorderDraftIngredient(currentIndex, target.index)
+                                                        draggingIndex = target.index
+                                                    }
+                                                }
+                                            )
+                                        }
 
                                 ) {
                                     Row(
@@ -228,6 +265,7 @@ fun AddMealScreen(
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(text = "${item.quantityInput} ${item.unit.toRussianUnitLabel()}")
                                         }
+                                        Text("⋮⋮")
                                         IconButton(onClick = { onEditDraftIngredient(item.id) }) {
                                             Text("✏️")
                                         }
@@ -392,16 +430,4 @@ private fun IngredientSheet(
             }
         }
     }
-}
-
-private fun lazyListStateSaver(): Saver<LazyListState, List<Int>> {
-    return Saver(
-        save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
-        restore = { restored ->
-            LazyListState(
-                firstVisibleItemIndex = restored.getOrElse(0) { 0 },
-                firstVisibleItemScrollOffset = restored.getOrElse(1) { 0 }
-            )
-        }
-    )
 }
