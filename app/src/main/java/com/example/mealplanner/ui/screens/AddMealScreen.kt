@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.local.Ingredient
+import com.example.mealplanner.ui.presentation.toRussianUnitLabel
 import com.example.mealplanner.viewmodel.AddMealStep
 import com.example.mealplanner.viewmodel.AddMealUiState
 
@@ -225,7 +226,7 @@ fun AddMealScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(text = item.name)
                                             Spacer(modifier = Modifier.height(4.dp))
-                                            Text(text = "${item.quantityInput} ${item.unit}")
+                                            Text(text = "${item.quantityInput} ${item.unit.toRussianUnitLabel()}")
                                         }
                                         IconButton(onClick = { onEditDraftIngredient(item.id) }) {
                                             Text("✏️")
@@ -336,7 +337,7 @@ private fun IngredientSheet(
                     }
                     items(items = ingredients, key = { item -> item.id }) { ingredient ->
                         Text(
-                            text = "${ingredient.name} (${ingredient.unit})",
+                            text = "${ingredient.name} (${ingredient.unit.toRussianUnitLabel()})",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
@@ -353,7 +354,7 @@ private fun IngredientSheet(
                 onExpandedChange = { unitExpanded = !unitExpanded }
             ) {
                 OutlinedTextField(
-                    value = selectedUnit,
+                    value = selectedUnit.toRussianUnitLabel(),
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Единица") },
@@ -369,7 +370,7 @@ private fun IngredientSheet(
                 ) {
                     availableUnits.forEach { unit ->
                         DropdownMenuItem(
-                            text = { Text(unit) },
+                            text = { Text(unit.toRussianUnitLabel()) },
                             onClick = {
                                 onUnitChange(unit)
                                 unitExpanded = false

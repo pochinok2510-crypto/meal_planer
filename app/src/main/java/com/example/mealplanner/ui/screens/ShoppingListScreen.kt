@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
+import com.example.mealplanner.ui.presentation.toRussianUnitLabel
 import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -132,7 +133,7 @@ fun ShoppingListScreen(
                                         }
                                     )
                                     Text(
-                                        text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit}",
+                                        text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit.toRussianUnitLabel()}",
                                         modifier = Modifier
                                             .padding(start = 8.dp)
                                             .weight(1f)
