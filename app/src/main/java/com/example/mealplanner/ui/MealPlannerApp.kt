@@ -36,25 +36,29 @@ import com.example.mealplanner.ui.screens.MenuScreen
 import com.example.mealplanner.ui.screens.SettingsScreen
 import com.example.mealplanner.ui.screens.ShoppingListScreen
 import com.example.mealplanner.ui.screens.WeeklyPlannerScreen
+import com.example.mealplanner.viewmodel.AppViewModel
 import com.example.mealplanner.viewmodel.MealPlannerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MealPlannerApp(viewModel: MealPlannerViewModel) {
+fun MealPlannerApp(
+    mealPlannerViewModel: MealPlannerViewModel,
+    appViewModel: AppViewModel
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val meals by viewModel.meals.collectAsState()
-    val filteredMeals by viewModel.filteredMeals.collectAsState()
-    val mealFilters by viewModel.mealFilters.collectAsState()
-    val mealFilterOptions by viewModel.menuMealFilterOptions.collectAsState()
-    val groups by viewModel.groups.collectAsState()
-    val weeklyPlan by viewModel.weeklyPlan.collectAsState()
-    val settings by viewModel.settings.collectAsState()
-    val dayCount by viewModel.dayCount.collectAsState()
-    val purchasedIngredientKeys by viewModel.purchasedIngredientKeys.collectAsState()
-    val addMealState by viewModel.addMealUiState.collectAsState()
-    val groupedFilteredIngredientCatalog by viewModel.groupedFilteredIngredientCatalog.collectAsState()
-    val undoUiState by viewModel.undoUiState.collectAsState()
+    val meals by mealPlannerViewModel.meals.collectAsState()
+    val filteredMeals by mealPlannerViewModel.filteredMeals.collectAsState()
+    val mealFilters by mealPlannerViewModel.mealFilters.collectAsState()
+    val mealFilterOptions by mealPlannerViewModel.menuMealFilterOptions.collectAsState()
+    val groups by mealPlannerViewModel.groups.collectAsState()
+    val weeklyPlan by mealPlannerViewModel.weeklyPlan.collectAsState()
+    val settings by appViewModel.settings.collectAsState()
+    val dayCount by mealPlannerViewModel.dayCount.collectAsState()
+    val purchasedIngredientKeys by mealPlannerViewModel.purchasedIngredientKeys.collectAsState()
+    val addMealState by mealPlannerViewModel.addMealUiState.collectAsState()
+    val groupedFilteredIngredientCatalog by mealPlannerViewModel.groupedFilteredIngredientCatalog.collectAsState()
+    val undoUiState by mealPlannerViewModel.undoUiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(undoUiState?.id) {
@@ -67,9 +71,9 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         )
 
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-            viewModel.undoLastRemoval()
+            mealPlannerViewModel.undoLastRemoval()
         } else {
-            viewModel.dismissUndoState()
+            mealPlannerViewModel.dismissUndoState()
         }
     }
 
@@ -78,7 +82,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        val saved = viewModel.saveShoppingListPdfToUri(uri)
+        val saved = mealPlannerViewModel.saveShoppingListPdfToUri(uri)
         Toast.makeText(
             context,
             if (saved) "PDF сохранён" else "Не удалось сохранить PDF",
@@ -92,7 +96,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        viewModel.exportDatabaseToUri(uri) { saved ->
+        mealPlannerViewModel.exportDatabaseToUri(uri) { saved ->
             Toast.makeText(
                 context,
                 if (saved) "База данных экспортирована" else "Не удалось экспортировать базу данных",
@@ -109,7 +113,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        viewModel.importDatabaseFromUri(uri, overwritePlanner = importMode.value) { result ->
+        mealPlannerViewModel.importDatabaseFromUri(uri, overwritePlanner = importMode.value) { result ->
             val message = if (result.isSuccess) {
                 "Импорт завершён: блюд ${result.importedMeals}, ингредиентов ${result.importedIngredients}"
             } else {
@@ -174,16 +178,16 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     groups = groups,
                     mealFilterState = mealFilters,
                     mealFilterOptions = mealFilterOptions,
-                    onRemoveMeal = viewModel::removeMeal,
-                    onMoveMealToGroup = viewModel::moveMealToGroup,
-                    onDuplicateMealToGroup = viewModel::duplicateMealToGroup,
-                    onCreateGroup = viewModel::addGroup,
-                    onDeleteGroup = viewModel::removeGroup,
-                    onEditGroup = viewModel::renameGroup,
-                    onMealFilterGroupSelect = viewModel::updateMealFilterGroup,
-                    onMealFilterIngredientSelect = viewModel::updateMealFilterIngredient,
-                    onMealFilterCategorySelect = viewModel::updateMealFilterCategory,
-                    onClearMealFilters = viewModel::clearMealFilters,
+                    onRemoveMeal = mealPlannerViewModel::removeMeal,
+                    onMoveMealToGroup = mealPlannerViewModel::moveMealToGroup,
+                    onDuplicateMealToGroup = mealPlannerViewModel::duplicateMealToGroup,
+                    onCreateGroup = mealPlannerViewModel::addGroup,
+                    onDeleteGroup = mealPlannerViewModel::removeGroup,
+                    onEditGroup = mealPlannerViewModel::renameGroup,
+                    onMealFilterGroupSelect = mealPlannerViewModel::updateMealFilterGroup,
+                    onMealFilterIngredientSelect = mealPlannerViewModel::updateMealFilterIngredient,
+                    onMealFilterCategorySelect = mealPlannerViewModel::updateMealFilterCategory,
+                    onClearMealFilters = mealPlannerViewModel::clearMealFilters,
                     onNavigateToAddMeal = { navController.navigate(Screen.AddMeal.route) },
                     onNavigateToShopping = { navController.navigate(Screen.ShoppingList.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
@@ -191,29 +195,29 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
             }
             composable(Screen.AddMeal.route) {
                 LaunchedEffect(groups) {
-                    viewModel.onAddMealScreenVisible(groups)
+                    mealPlannerViewModel.onAddMealScreenVisible(groups)
                 }
                 AddMealScreen(
                     groups = groups,
                     groupedFilteredIngredients = groupedFilteredIngredientCatalog,
                     state = addMealState,
                     onBack = { navController.popBackStack() },
-                    onMealNameChange = viewModel::updateAddMealName,
-                    onGroupSelect = viewModel::updateAddMealGroup,
-                    onMealTypeSelect = viewModel::updateAddMealType,
-                    onStepChange = viewModel::updateAddMealStep,
-                    onOpenIngredientSheet = viewModel::openIngredientSheet,
-                    onCloseIngredientSheet = viewModel::closeIngredientSheet,
-                    onIngredientSearchChange = viewModel::updateIngredientSearchQuery,
-                    onIngredientSelect = viewModel::selectIngredientFromCatalog,
-                    onIngredientUnitChange = viewModel::updateIngredientUnitInput,
-                    onIngredientQuantityChange = viewModel::updateIngredientQuantityInput,
-                    onConfirmIngredient = { viewModel.confirmIngredientFromSheet() },
-                    onEditDraftIngredient = viewModel::editDraftIngredient,
-                    onRemoveDraftIngredient = viewModel::removeDraftIngredient,
-                    onReorderDraftIngredient = viewModel::reorderDraftIngredient,
+                    onMealNameChange = mealPlannerViewModel::updateAddMealName,
+                    onGroupSelect = mealPlannerViewModel::updateAddMealGroup,
+                    onMealTypeSelect = mealPlannerViewModel::updateAddMealType,
+                    onStepChange = mealPlannerViewModel::updateAddMealStep,
+                    onOpenIngredientSheet = mealPlannerViewModel::openIngredientSheet,
+                    onCloseIngredientSheet = mealPlannerViewModel::closeIngredientSheet,
+                    onIngredientSearchChange = mealPlannerViewModel::updateIngredientSearchQuery,
+                    onIngredientSelect = mealPlannerViewModel::selectIngredientFromCatalog,
+                    onIngredientUnitChange = mealPlannerViewModel::updateIngredientUnitInput,
+                    onIngredientQuantityChange = mealPlannerViewModel::updateIngredientQuantityInput,
+                    onConfirmIngredient = { mealPlannerViewModel.confirmIngredientFromSheet() },
+                    onEditDraftIngredient = mealPlannerViewModel::editDraftIngredient,
+                    onRemoveDraftIngredient = mealPlannerViewModel::removeDraftIngredient,
+                    onReorderDraftIngredient = mealPlannerViewModel::reorderDraftIngredient,
                     onSaveMeal = {
-                        viewModel.saveMealFromDraft {
+                        mealPlannerViewModel.saveMealFromDraft {
                             navController.popBackStack()
                         }
                     }
@@ -223,22 +227,22 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 WeeklyPlannerScreen(
                     meals = meals,
                     weeklyPlan = weeklyPlan,
-                    onAssignMeal = viewModel::assignMealToSlot
+                    onAssignMeal = mealPlannerViewModel::assignMealToSlot
                 )
             }
             composable(Screen.ShoppingList.route) {
                 ShoppingListScreen(
-                    ingredients = viewModel.getAggregatedShoppingList(),
-                    categoriesByStorageKey = viewModel.getShoppingIngredientCategoriesByStorageKey(),
+                    ingredients = mealPlannerViewModel.getAggregatedShoppingList(),
+                    categoriesByStorageKey = mealPlannerViewModel.getShoppingIngredientCategoriesByStorageKey(),
                     dayCount = dayCount,
                     purchasedIngredientKeys = purchasedIngredientKeys,
-                    onIngredientPurchasedChange = viewModel::setIngredientPurchased,
-                    onRemoveIngredient = viewModel::removeShoppingIngredient,
+                    onIngredientPurchasedChange = mealPlannerViewModel::setIngredientPurchased,
+                    onRemoveIngredient = mealPlannerViewModel::removeShoppingIngredient,
                     onBack = { navController.popBackStack() },
-                    onClear = viewModel::clearShoppingSelection,
-                    onDayCountChange = viewModel::updateDayCount,
+                    onClear = mealPlannerViewModel::clearShoppingSelection,
+                    onDayCountChange = mealPlannerViewModel::updateDayCount,
                     onSend = {
-                        sharePdf(context, viewModel)
+                        sharePdf(context, mealPlannerViewModel)
                     },
                     onSavePdf = {
                         savePdfLauncher.launch("shopping-list-${System.currentTimeMillis()}.pdf")
@@ -249,8 +253,10 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                 SettingsScreen(
                     settings = settings,
                     onBack = { navController.popBackStack() },
-                    onPersistDataToggle = viewModel::updatePersistDataBetweenLaunches,
-                    onClearAfterExportToggle = viewModel::updateClearShoppingAfterExport,
+                    onPersistDataToggle = mealPlannerViewModel::updatePersistDataBetweenLaunches,
+                    onClearAfterExportToggle = mealPlannerViewModel::updateClearShoppingAfterExport,
+                    onThemeModeSelect = appViewModel::updateThemeMode,
+                    onAccentPaletteSelect = appViewModel::updateAccentPalette,
                     onExportDatabase = {
                         saveDatabaseExportLauncher.launch("meal-planner-export-${System.currentTimeMillis()}.json")
                     },
@@ -287,9 +293,9 @@ private fun labelFor(screen: Screen): String = when (screen) {
 
 private fun sharePdf(
     context: android.content.Context,
-    viewModel: MealPlannerViewModel
+    mealPlannerViewModel: MealPlannerViewModel
 ) {
-    val pdfFile = viewModel.createSharePdfFile()
+    val pdfFile = mealPlannerViewModel.createSharePdfFile()
     if (pdfFile == null) {
         Toast.makeText(context, "Список покупок пуст", Toast.LENGTH_LONG).show()
         return
@@ -301,7 +307,7 @@ private fun sharePdf(
         type = "application/pdf"
         putExtra(Intent.EXTRA_STREAM, contentUri)
         putExtra(Intent.EXTRA_SUBJECT, "Список покупок")
-        putExtra(Intent.EXTRA_TEXT, viewModel.buildShoppingListMessage())
+        putExtra(Intent.EXTRA_TEXT, mealPlannerViewModel.buildShoppingListMessage())
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.mealplanner.model.AccentPalette
+import com.example.mealplanner.model.AppThemeMode
 import com.example.mealplanner.model.SettingsState
 
 @Composable
@@ -27,6 +30,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onPersistDataToggle: (Boolean) -> Unit,
     onClearAfterExportToggle: (Boolean) -> Unit,
+    onThemeModeSelect: (AppThemeMode) -> Unit,
+    onAccentPaletteSelect: (AccentPalette) -> Unit,
     onExportDatabase: () -> Unit,
     onImportDatabaseMerge: () -> Unit,
     onImportDatabaseOverwrite: () -> Unit
@@ -132,6 +137,53 @@ fun SettingsScreen(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("Тема приложения")
+                ThemeOptionRow("Светлая", settings.themeMode == AppThemeMode.LIGHT) {
+                    onThemeModeSelect(AppThemeMode.LIGHT)
+                }
+                ThemeOptionRow("Тёмная", settings.themeMode == AppThemeMode.DARK) {
+                    onThemeModeSelect(AppThemeMode.DARK)
+                }
+                ThemeOptionRow("Системная", settings.themeMode == AppThemeMode.SYSTEM) {
+                    onThemeModeSelect(AppThemeMode.SYSTEM)
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Акцентный цвет")
+                AccentOptionRow("Изумруд", settings.accentPalette == AccentPalette.EMERALD) {
+                    onAccentPaletteSelect(AccentPalette.EMERALD)
+                }
+                AccentOptionRow("Океан", settings.accentPalette == AccentPalette.OCEAN) {
+                    onAccentPaletteSelect(AccentPalette.OCEAN)
+                }
+                AccentOptionRow("Закат", settings.accentPalette == AccentPalette.SUNSET) {
+                    onAccentPaletteSelect(AccentPalette.SUNSET)
+                }
+                AccentOptionRow("Лаванда", settings.accentPalette == AccentPalette.LAVENDER) {
+                    onAccentPaletteSelect(AccentPalette.LAVENDER)
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text("Резервная копия и восстановление")
                 Text(
                     "Быстрый доступ к экспорту и импорту базы данных.",
@@ -146,5 +198,27 @@ fun SettingsScreen(
         Button(onClick = onBack) {
             Text("← Назад")
         }
+    }
+}
+
+@Composable
+private fun ThemeOptionRow(title: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(title)
+    }
+}
+
+@Composable
+private fun AccentOptionRow(title: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(title)
     }
 }
