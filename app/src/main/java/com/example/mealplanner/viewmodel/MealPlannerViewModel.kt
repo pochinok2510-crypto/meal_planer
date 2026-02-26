@@ -17,6 +17,7 @@ import com.example.mealplanner.model.MealSlot
 import com.example.mealplanner.model.PlanDay
 import com.example.mealplanner.model.WeeklyPlanAssignment
 import com.example.mealplanner.model.SettingsState
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -99,6 +101,7 @@ class MealPlannerViewModel(
     private val mealsRepository = MealsRepository(application)
     private val ingredientRepository = IngredientRepository(application)
     private val settingsDataStore = SettingsDataStore(application)
+    private val gson = GsonBuilder().setPrettyPrinting().create()
 
     private val _meals = MutableStateFlow(emptyList<Meal>())
     val meals: StateFlow<List<Meal>> = _meals.asStateFlow()
@@ -656,6 +659,26 @@ class MealPlannerViewModel(
             if (mealId.isNullOrBlank()) current - key else current + (key to mealId)
         }
         persistPlannerStateIfEnabled()
+    }
+
+    fun exportDatabaseToUri(uri: Uri, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val exported = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val resolver = getApplication<Application>().contentResolver
+                    val payload = mealsRepository.buildDatabaseExportPayload()
+
+                    resolver.openOutputStream(uri, "wt")?.bufferedWriter(Charsets.UTF_8)?.use { writer ->
+                        writer.write(gson.toJson(payload))
+                    } ?: return@runCatching false
+
+                    true
+                }.getOrElse {
+                    false
+                }
+            }
+            onComplete(exported)
+        }
     }
 
     fun clearShoppingSelection() {

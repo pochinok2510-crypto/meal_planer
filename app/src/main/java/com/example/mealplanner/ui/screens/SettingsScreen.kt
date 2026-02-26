@@ -19,7 +19,8 @@ fun SettingsScreen(
     settings: SettingsState,
     onBack: () -> Unit,
     onPersistDataToggle: (Boolean) -> Unit,
-    onClearAfterExportToggle: (Boolean) -> Unit
+    onClearAfterExportToggle: (Boolean) -> Unit,
+    onExportDatabase: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -41,6 +42,10 @@ fun SettingsScreen(
                 checked = settings.clearShoppingAfterExport,
                 onCheckedChange = onClearAfterExportToggle
             )
+        }
+
+        Button(onClick = onExportDatabase) {
+            Text("Экспорт базы данных (JSON)")
         }
 
         Button(onClick = onBack) {
