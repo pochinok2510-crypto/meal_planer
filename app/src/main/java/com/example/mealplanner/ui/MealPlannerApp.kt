@@ -277,6 +277,8 @@ fun MealPlannerApp(
     }
 }
 
+}
+
 private fun iconFor(screen: Screen): String = when (screen) {
     Screen.Menu -> "📋"
     Screen.AddMeal -> "➕"
