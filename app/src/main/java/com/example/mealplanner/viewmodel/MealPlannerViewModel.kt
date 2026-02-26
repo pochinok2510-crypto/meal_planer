@@ -321,13 +321,20 @@ class MealPlannerViewModel(
     }
 
     fun updateIngredientSearchQuery(value: String) {
+        val normalizedQuery = value.trim()
         val match = ingredientCatalog.value.firstOrNull { ingredient ->
-            ingredient.name.equals(value.trim(), ignoreCase = true)
+            ingredient.name.equals(normalizedQuery, ignoreCase = true)
         }
+        val smartDefaultUnit = if (match == null) {
+            detectSmartDefaultUnit(normalizedQuery)
+        } else {
+            null
+        }
+
         updateAddMealState {
             it.copy(
                 ingredientSearchQuery = value,
-                ingredientUnitInput = match?.unit ?: it.ingredientUnitInput,
+                ingredientUnitInput = match?.unit ?: smartDefaultUnit.orEmpty(),
                 error = null
             )
         }
@@ -809,6 +816,18 @@ class MealPlannerViewModel(
         }
     }
 
+    private fun detectSmartDefaultUnit(query: String): String? {
+        if (query.isBlank()) return null
+
+        val normalizedQuery = query.lowercase(Locale.getDefault())
+        return when {
+            SMART_DEFAULT_PCS_KEYWORDS.any { keyword -> normalizedQuery.contains(keyword) } -> "pcs"
+            SMART_DEFAULT_ML_KEYWORDS.any { keyword -> normalizedQuery.contains(keyword) } -> "ml"
+            SMART_DEFAULT_GRAMS_KEYWORDS.any { keyword -> normalizedQuery.contains(keyword) } -> "g"
+            else -> null
+        }
+    }
+
     private fun updateAddMealState(transform: (AddMealUiState) -> AddMealUiState) {
         _addMealUiState.update { current ->
             val next = transform(current)
@@ -859,6 +878,10 @@ class MealPlannerViewModel(
 
     companion object {
         private const val OTHER_INGREDIENT_CATEGORY = "Other"
+
+        private val SMART_DEFAULT_PCS_KEYWORDS = listOf("egg", "eggs", "яйц")
+        private val SMART_DEFAULT_ML_KEYWORDS = listOf("milk", "молок")
+        private val SMART_DEFAULT_GRAMS_KEYWORDS = listOf("flour", "мук")
 
         private const val KEY_MEAL_NAME = "add_meal_name"
         private const val KEY_SELECTED_GROUP = "add_meal_group"
