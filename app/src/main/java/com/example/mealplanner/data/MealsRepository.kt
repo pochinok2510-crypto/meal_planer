@@ -12,6 +12,8 @@ import com.example.mealplanner.model.Ingredient
 import com.example.mealplanner.model.Meal
 import com.example.mealplanner.model.WeeklyPlanAssignment
 import com.google.gson.Gson
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import java.util.UUID
@@ -115,6 +117,85 @@ class MealsRepository(context: Context) {
             groups = normalizeGroups(parsedGroups)
         )
     }
+
+    suspend fun importDatabaseFromJson(rawJson: String, overwritePlanner: Boolean): DatabaseImportResult =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val payload = parseImportPayload(rawJson)
+                val existingState = loadState()
+                db.withTransaction {
+                    val ingredientIdRemap = payload.ingredients.associate { ingredient ->
+                        ingredient.id to findOrCreateIngredientId(ingredient.name.trim(), ingredient.unit.trim())
+                    }
+
+                    val mealIdRemap = mutableMapOf<Long, Long>()
+                    payload.meals.forEach { meal ->
+                        val insertedMealId = mealDao.insertMeal(
+                            meal.copy(
+                                id = 0,
+                                name = meal.name.trim(),
+                                groupName = meal.groupName.trim().ifBlank { UNCATEGORIZED_GROUP },
+                                legacyIngredients = null
+                            )
+                        )
+                        mealIdRemap[meal.id] = insertedMealId
+                    }
+
+                    val crossRefsToInsert = payload.crossRefs.mapNotNull { crossRef ->
+                        val newMealId = mealIdRemap[crossRef.mealId] ?: return@mapNotNull null
+                        val newIngredientId = ingredientIdRemap[crossRef.ingredientId] ?: return@mapNotNull null
+                        MealIngredientCrossRef(
+                            mealId = newMealId,
+                            ingredientId = newIngredientId,
+                            quantity = crossRef.quantity
+                        )
+                    }
+                    mealDao.insertCrossRefs(crossRefsToInsert)
+
+                    val importedAssignments = payload.planner.weeklyPlan.mapNotNull { assignment ->
+                        val oldMealId = assignment.mealId.toDbMealIdOrNull() ?: return@mapNotNull null
+                        val remappedMealId = mealIdRemap[oldMealId] ?: return@mapNotNull null
+                        assignment.copy(mealId = remappedMealId.toDomainMealId())
+                    }
+
+                    val mergedWeeklyPlan = if (overwritePlanner) {
+                        importedAssignments
+                    } else {
+                        (existingState.weeklyPlan + importedAssignments)
+                            .distinctBy { assignment -> assignment.day to assignment.slot }
+                    }
+
+                    val mergedPurchasedKeys = if (overwritePlanner) {
+                        payload.planner.purchasedIngredientKeys.distinct()
+                    } else {
+                        (existingState.purchasedIngredientKeys + payload.planner.purchasedIngredientKeys).distinct()
+                    }
+
+                    val mergedGroups = if (overwritePlanner) {
+                        normalizeGroups(payload.groups)
+                    } else {
+                        normalizeGroups(existingState.groups + payload.groups)
+                    }
+
+                    saveState(
+                        existingState.copy(
+                            groups = mergedGroups,
+                            purchasedIngredientKeys = mergedPurchasedKeys,
+                            weeklyPlan = mergedWeeklyPlan,
+                            dayMultiplier = if (overwritePlanner) payload.planner.dayCount.coerceIn(1, 30) else existingState.dayMultiplier
+                        )
+                    )
+
+                    DatabaseImportResult(
+                        importedMeals = mealIdRemap.size,
+                        importedIngredients = ingredientIdRemap.size,
+                        importedAssignments = importedAssignments.size
+                    )
+                }
+            }.getOrElse {
+                DatabaseImportResult(error = it.message ?: "Неверный файл импорта")
+            }
+        }
 
     suspend fun saveState(state: PlannerState) = withContext(Dispatchers.IO) {
         val entity = PlannerStateEntity(
@@ -250,6 +331,43 @@ class MealsRepository(context: Context) {
         return ingredientDao.findByName(name)?.id ?: throw IllegalStateException("Cannot resolve ingredient id for $name")
     }
 
+    private fun parseImportPayload(rawJson: String): DatabaseExportPayload {
+        val root = JsonParser.parseString(rawJson)
+        require(root.isJsonObject) { "Неверный JSON: ожидается объект" }
+        val rootObj = root.asJsonObject
+
+        validateArray(rootObj, "meals")
+        validateArray(rootObj, "ingredients")
+        validateArray(rootObj, "crossRefs")
+        validateObject(rootObj, "planner")
+        validateArray(rootObj, "groups")
+
+        val payload = gson.fromJson(rootObj, DatabaseExportPayload::class.java)
+
+        require(payload.meals.all { it.name.isNotBlank() }) { "Неверный JSON: meal.name пуст" }
+        require(payload.ingredients.all { it.name.isNotBlank() && it.unit.isNotBlank() }) {
+            "Неверный JSON: ingredient.name/unit пуст"
+        }
+
+        val mealIds = payload.meals.map { it.id }.toSet()
+        val ingredientIds = payload.ingredients.map { it.id }.toSet()
+        require(payload.crossRefs.all { it.mealId in mealIds && it.ingredientId in ingredientIds }) {
+            "Неверный JSON: crossRefs содержит несуществующие ссылки"
+        }
+
+        return payload
+    }
+
+    private fun validateArray(root: JsonObject, key: String) {
+        val element = root[key]
+        require(element != null && element.isJsonArray) { "Неверный JSON: поле '$key' отсутствует или не массив" }
+    }
+
+    private fun validateObject(root: JsonObject, key: String) {
+        val element: JsonElement? = root[key]
+        require(element != null && element.isJsonObject) { "Неверный JSON: поле '$key' отсутствует или не объект" }
+    }
+
     private fun List<MealIngredientRow>.toDomainMeals(): List<Meal> {
         return groupBy { it.mealId }.values.map { rows ->
             val first = rows.first()
@@ -295,6 +413,15 @@ data class DatabaseExportPayload(
     val groups: List<String>
 )
 
+data class DatabaseImportResult(
+    val importedMeals: Int = 0,
+    val importedIngredients: Int = 0,
+    val importedAssignments: Int = 0,
+    val error: String? = null
+) {
+    val isSuccess: Boolean get() = error == null
+}
+
 data class PlannerState(
     val meals: List<Meal> = emptyList(),
     val groups: List<String> = MealsRepository.DEFAULT_GROUPS,
@@ -315,4 +442,3 @@ private data class LegacyPlannerState(
     val weeklyPlan: List<WeeklyPlanAssignment> = emptyList(),
     val dayCount: Int = 1
 )
-
