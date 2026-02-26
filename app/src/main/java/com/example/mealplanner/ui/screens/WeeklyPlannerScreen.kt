@@ -1,5 +1,5 @@
 package com.example.mealplanner.ui.screens
-
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,6 +34,7 @@ import com.example.mealplanner.model.Meal
 import com.example.mealplanner.model.MealSlot
 import com.example.mealplanner.model.PlanDay
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WeeklyPlannerScreen(
     meals: List<Meal>,

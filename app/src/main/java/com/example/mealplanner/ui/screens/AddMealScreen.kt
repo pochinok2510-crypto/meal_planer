@@ -1,5 +1,6 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,7 +54,7 @@ private const val INGREDIENT_OTHER_CATEGORY = "Other"
 private val SUPPORTED_UNITS = listOf("g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "pack")
 private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Перекус")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AddMealScreen(
     groups: List<String>,

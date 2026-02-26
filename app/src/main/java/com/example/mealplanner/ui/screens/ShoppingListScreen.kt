@@ -1,5 +1,5 @@
 package com.example.mealplanner.ui.screens
-
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShoppingListScreen(
     ingredients: List<Ingredient>,
