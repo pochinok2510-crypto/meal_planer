@@ -56,6 +56,24 @@ data class AddMealUiState(
     val error: String? = null
 )
 
+data class UndoUiState(
+    val id: Long,
+    val message: String,
+    val actionLabel: String = "Отменить"
+)
+
+private sealed interface PendingUndoAction {
+    data class DraftIngredientRemoval(
+        val ingredient: MealIngredientDraft,
+        val index: Int
+    ) : PendingUndoAction
+
+    data class ShoppingIngredientRemoval(
+        val ingredient: Ingredient,
+        val wasPurchased: Boolean
+    ) : PendingUndoAction
+}
+
 private fun List<MealIngredientDraft>.sortedAlphabetically(): List<MealIngredientDraft> {
     return sortedWith(
         compareBy<MealIngredientDraft>(
@@ -96,6 +114,14 @@ class MealPlannerViewModel(
 
     private val _settings = MutableStateFlow(SettingsState())
     val settings: StateFlow<SettingsState> = _settings.asStateFlow()
+
+    private val _hiddenShoppingIngredientKeys = MutableStateFlow(setOf<String>())
+
+    private val _undoUiState = MutableStateFlow<UndoUiState?>(null)
+    val undoUiState: StateFlow<UndoUiState?> = _undoUiState.asStateFlow()
+
+    private var pendingUndoAction: PendingUndoAction? = null
+    private var undoEventId: Long = 0
 
     val ingredientCatalog = ingredientRepository.getAllIngredients()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -400,10 +426,66 @@ class MealPlannerViewModel(
 
     fun removeDraftIngredient(draftId: String) {
         updateAddMealState { state ->
-            val updated = state.selectedIngredients.filterNot { it.id == draftId }
-            if (updated.size == state.selectedIngredients.size) return@updateAddMealState state
-            state.copy(selectedIngredients = updated.sortedAlphabetically(), error = null)
+            val index = state.selectedIngredients.indexOfFirst { it.id == draftId }
+            if (index < 0) return@updateAddMealState state
+
+            val removedIngredient = state.selectedIngredients[index]
+            pendingUndoAction = PendingUndoAction.DraftIngredientRemoval(
+                ingredient = removedIngredient,
+                index = index
+            )
+            publishUndoEvent("Ингредиент удалён")
+
+            val updated = state.selectedIngredients.toMutableList().apply {
+                removeAt(index)
+            }
+            state.copy(selectedIngredients = updated, error = null)
         }
+    }
+
+    fun removeShoppingIngredient(ingredient: Ingredient) {
+        val key = ingredient.storageKey()
+        val wasPurchased = key in _purchasedIngredientKeys.value
+
+        _hiddenShoppingIngredientKeys.update { it + key }
+        _purchasedIngredientKeys.update { it - key }
+
+        pendingUndoAction = PendingUndoAction.ShoppingIngredientRemoval(
+            ingredient = ingredient,
+            wasPurchased = wasPurchased
+        )
+        publishUndoEvent("Позиция удалена из списка")
+        persistPlannerStateIfEnabled()
+    }
+
+    fun undoLastRemoval() {
+        when (val action = pendingUndoAction) {
+            is PendingUndoAction.DraftIngredientRemoval -> {
+                updateAddMealState { state ->
+                    val restored = state.selectedIngredients.toMutableList().apply {
+                        add(action.index.coerceIn(0, size), action.ingredient)
+                    }
+                    state.copy(selectedIngredients = restored, error = null)
+                }
+            }
+
+            is PendingUndoAction.ShoppingIngredientRemoval -> {
+                val key = action.ingredient.storageKey()
+                _hiddenShoppingIngredientKeys.update { it - key }
+                if (action.wasPurchased) {
+                    _purchasedIngredientKeys.update { it + key }
+                }
+                persistPlannerStateIfEnabled()
+            }
+
+            null -> Unit
+        }
+
+        clearUndoState()
+    }
+
+    fun dismissUndoState() {
+        clearUndoState()
     }
 
     fun editDraftIngredient(draftId: String) {
@@ -480,6 +562,7 @@ class MealPlannerViewModel(
 
     fun clearShoppingSelection() {
         _weeklyPlan.value = emptyMap()
+        _hiddenShoppingIngredientKeys.value = emptySet()
         persistPlannerStateIfEnabled()
     }
 
@@ -543,6 +626,7 @@ class MealPlannerViewModel(
                     unit = first.displayUnit.ifBlank { first.normalizedUnit }
                 )
             }
+            .filterNot { ingredient -> ingredient.storageKey() in _hiddenShoppingIngredientKeys.value }
             .sortedBy { it.name }
     }
 
@@ -619,7 +703,18 @@ class MealPlannerViewModel(
         _groups.value = MealsRepository.DEFAULT_GROUPS
         _weeklyPlan.value = emptyMap()
         _purchasedIngredientKeys.value = emptySet()
+        _hiddenShoppingIngredientKeys.value = emptySet()
         _dayCount.value = 1
+    }
+
+    private fun publishUndoEvent(message: String) {
+        undoEventId += 1
+        _undoUiState.value = UndoUiState(id = undoEventId, message = message)
+    }
+
+    private fun clearUndoState() {
+        pendingUndoAction = null
+        _undoUiState.value = null
     }
 
     private fun persistPlannerStateIfEnabled() {
