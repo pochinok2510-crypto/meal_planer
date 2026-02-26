@@ -51,6 +51,7 @@ import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
 import com.example.mealplanner.viewmodel.MealFilterOptions
 import com.example.mealplanner.viewmodel.MealFilterState
+import com.example.mealplanner.ui.presentation.LocalUiDensity
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -74,6 +75,9 @@ fun MenuScreen(
     onNavigateToShopping: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
+    val density = LocalUiDensity.current
+    val contentPadding = 16.dp * density.spacingMultiplier
+    val sectionSpacing = 12.dp * density.spacingMultiplier
     var newGroupName by remember { mutableStateOf("") }
     var groupError by remember { mutableStateOf<String?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -100,8 +104,8 @@ fun MenuScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
         OutlinedTextField(
             value = searchQuery,

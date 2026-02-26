@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
 import com.example.mealplanner.ui.presentation.toRussianUnitLabel
+import com.example.mealplanner.ui.presentation.LocalUiDensity
 import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -59,6 +61,10 @@ fun ShoppingListScreen(
     onSend: () -> Unit,
     onSavePdf: () -> Unit
 ) {
+    val density = LocalUiDensity.current
+    val contentPadding = 16.dp * density.spacingMultiplier
+    val sectionSpacing = 12.dp * density.spacingMultiplier
+    val minCardHeight = 64.dp * density.cardHeightMultiplier
     val showSendOptions = remember { mutableStateOf(false) }
     val groupedIngredients = remember(ingredients, categoriesByStorageKey) {
         ingredients.groupBy { ingredient ->
@@ -73,11 +79,13 @@ fun ShoppingListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = minCardHeight),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -179,10 +187,14 @@ private fun CategorySection(
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
     onRemoveIngredient: (Ingredient) -> Unit
 ) {
+    val density = LocalUiDensity.current
+    val minCardHeight = 64.dp * density.cardHeightMultiplier
     val accentColor = categoryAccentColor(category)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = minCardHeight),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(

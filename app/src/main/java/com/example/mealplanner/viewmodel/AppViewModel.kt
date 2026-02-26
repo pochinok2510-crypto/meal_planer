@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mealplanner.data.SettingsDataStore
 import com.example.mealplanner.model.AccentPalette
 import com.example.mealplanner.model.AppThemeMode
+import com.example.mealplanner.model.DensityMode
 import com.example.mealplanner.model.SettingsState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun updateAccentPalette(palette: AccentPalette) {
         viewModelScope.launch {
             settingsDataStore.setAccentPalette(palette)
+        }
+    }
+
+    fun updateDensityMode(mode: DensityMode) {
+        viewModelScope.launch {
+            settingsDataStore.setDensityMode(mode)
         }
     }
 }
