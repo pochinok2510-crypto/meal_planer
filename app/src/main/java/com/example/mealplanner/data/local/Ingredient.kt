@@ -23,5 +23,6 @@ data class Ingredient(
     val id: Long = 0,
     val name: String,
     val unit: String,
-    val groupId: String
+    val groupId: String,
+    val createdAt: Long = System.currentTimeMillis()
 )

@@ -11,5 +11,6 @@ import androidx.room.PrimaryKey
 data class IngredientGroup(
     @PrimaryKey
     val id: String,
-    val name: String
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis()
 )

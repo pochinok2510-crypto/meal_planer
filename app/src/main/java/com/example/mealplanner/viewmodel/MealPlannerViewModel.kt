@@ -56,6 +56,7 @@ data class AddMealUiState(
     val ingredientSearchQuery: String = "",
     val ingredientUnitInput: String = "",
     val ingredientQuantityInput: String = "",
+    val ingredientGroupId: String = "",
     val error: String? = null
 )
 
@@ -154,6 +155,7 @@ class MealPlannerViewModel(
             ingredientSearchQuery = savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] ?: "",
             ingredientUnitInput = savedStateHandle[KEY_INGREDIENT_UNIT_INPUT] ?: "",
             ingredientQuantityInput = savedStateHandle[KEY_INGREDIENT_QUANTITY_INPUT] ?: "",
+            ingredientGroupId = savedStateHandle[KEY_INGREDIENT_GROUP_ID] ?: "",
             error = savedStateHandle[KEY_ADD_MEAL_ERROR]
         )
     )
@@ -391,7 +393,17 @@ class MealPlannerViewModel(
     }
 
     fun openIngredientSheet() {
-        updateAddMealState { it.copy(isIngredientSheetVisible = true, error = null) }
+        val groups = ingredientGroups.value
+        val defaultGroupId = groups.firstOrNull { it.name.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }?.id
+            ?: groups.firstOrNull()?.id
+            ?: ""
+        updateAddMealState {
+            it.copy(
+                isIngredientSheetVisible = true,
+                ingredientGroupId = if (it.ingredientGroupId.isNotBlank()) it.ingredientGroupId else defaultGroupId,
+                error = null
+            )
+        }
     }
 
     fun closeIngredientSheet() {
@@ -401,6 +413,7 @@ class MealPlannerViewModel(
                 ingredientSearchQuery = "",
                 ingredientUnitInput = "",
                 ingredientQuantityInput = "",
+                ingredientGroupId = "",
                 error = null
             )
         }
@@ -418,7 +431,7 @@ class MealPlannerViewModel(
     }
 
     fun deleteCatalogIngredient(ingredientId: Long) {
-        viewModelScope.launch { ingredientRepository.deleteById(ingredientId) }
+        viewModelScope.launch { ingredientRepository.deleteIngredient(ingredientId) }
     }
 
     fun updateIngredientSearchQuery(value: String) {
@@ -459,13 +472,17 @@ class MealPlannerViewModel(
         updateAddMealState { it.copy(ingredientQuantityInput = value, error = null) }
     }
 
+    fun updateIngredientGroupSelection(groupId: String) {
+        updateAddMealState { it.copy(ingredientGroupId = groupId, error = null) }
+    }
+
     fun confirmIngredientFromSheet(): Boolean {
         val state = _addMealUiState.value
         val added = addIngredientToMealDraft(
             nameInput = state.ingredientSearchQuery,
             unitInput = state.ingredientUnitInput,
             quantityInput = state.ingredientQuantityInput,
-            groupId = ""
+            groupId = state.ingredientGroupId
         )
         if (added) {
             closeIngredientSheet()
@@ -1005,6 +1022,7 @@ class MealPlannerViewModel(
             savedStateHandle[KEY_INGREDIENT_SEARCH_QUERY] = next.ingredientSearchQuery
             savedStateHandle[KEY_INGREDIENT_UNIT_INPUT] = next.ingredientUnitInput
             savedStateHandle[KEY_INGREDIENT_QUANTITY_INPUT] = next.ingredientQuantityInput
+            savedStateHandle[KEY_INGREDIENT_GROUP_ID] = next.ingredientGroupId
             savedStateHandle[KEY_ADD_MEAL_ERROR] = next.error
             next
         }
@@ -1055,6 +1073,7 @@ class MealPlannerViewModel(
         private const val KEY_INGREDIENT_SEARCH_QUERY = "add_meal_ingredient_search_query"
         private const val KEY_INGREDIENT_UNIT_INPUT = "add_meal_ingredient_unit_input"
         private const val KEY_INGREDIENT_QUANTITY_INPUT = "add_meal_ingredient_quantity_input"
+        private const val KEY_INGREDIENT_GROUP_ID = "add_meal_ingredient_group_id"
         private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
     }
 }
