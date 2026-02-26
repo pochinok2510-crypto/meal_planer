@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShoppingListScreen(
     ingredients: List<Ingredient>,
@@ -84,6 +86,7 @@ fun ShoppingListScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+
                     ) {
                         Row(
                             modifier = Modifier

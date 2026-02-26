@@ -1,5 +1,6 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -52,7 +54,7 @@ private const val INGREDIENT_OTHER_CATEGORY = "Other"
 private val SUPPORTED_UNITS = listOf("g", "kg", "ml", "l", "pcs", "tsp", "tbsp", "pack")
 private val MEAL_TYPES = listOf("Завтрак", "Обед", "Ужин", "Перекус")
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AddMealScreen(
     groups: List<String>,
@@ -212,6 +214,7 @@ fun AddMealScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
+
                                 ) {
                                     Row(
                                         modifier = Modifier
