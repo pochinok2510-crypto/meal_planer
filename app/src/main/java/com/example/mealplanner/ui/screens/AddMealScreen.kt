@@ -209,7 +209,10 @@ fun AddMealScreen(
                                 enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
                                 exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
                             ) {
-                                Card(modifier = Modifier.fillMaxWidth()) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()

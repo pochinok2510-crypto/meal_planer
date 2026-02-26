@@ -1,5 +1,11 @@
 package com.example.mealplanner.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,16 +62,29 @@ fun ShoppingListScreen(
             }
         }
 
-        if (ingredients.isEmpty()) {
+        AnimatedVisibility(
+            visible = ingredients.isEmpty(),
+            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+        ) {
             Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
-        } else {
+        }
+
+        AnimatedVisibility(
+            visible = ingredients.isNotEmpty(),
+            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+            exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
+        ) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(ingredients, key = { "${it.name}_${it.unit}" }) { ingredient ->
+                items(ingredients, key = { it.storageKey() }) { ingredient ->
                     val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
