@@ -9,6 +9,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.mealplanner.data.IngredientRepository
 import com.example.mealplanner.data.MealsRepository
+import com.example.mealplanner.data.DatabaseImportResult
 import com.example.mealplanner.data.PlannerState
 import com.example.mealplanner.data.SettingsDataStore
 import com.example.mealplanner.model.Ingredient
@@ -659,6 +660,33 @@ class MealPlannerViewModel(
             if (mealId.isNullOrBlank()) current - key else current + (key to mealId)
         }
         persistPlannerStateIfEnabled()
+    }
+
+    fun importDatabaseFromUri(
+        uri: Uri,
+        overwritePlanner: Boolean,
+        onComplete: (DatabaseImportResult) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val resolver = getApplication<Application>().contentResolver
+                    val rawJson = resolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+                        reader.readText()
+                    } ?: return@runCatching DatabaseImportResult(error = "Не удалось открыть файл")
+
+                    mealsRepository.importDatabaseFromJson(rawJson = rawJson, overwritePlanner = overwritePlanner)
+                }.getOrElse { throwable ->
+                    DatabaseImportResult(error = throwable.message ?: "Ошибка импорта")
+                }
+            }
+
+            if (result.isSuccess && settings.value.persistDataBetweenLaunches) {
+                restorePlannerState(mealsRepository.loadState())
+            }
+
+            onComplete(result)
+        }
     }
 
     fun exportDatabaseToUri(uri: Uri, onComplete: (Boolean) -> Unit) {

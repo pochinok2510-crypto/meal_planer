@@ -101,6 +101,25 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
         }
     }
 
+
+    val importMode = remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val importDatabaseLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        viewModel.importDatabaseFromUri(uri, overwritePlanner = importMode.value) { result ->
+            val message = if (result.isSuccess) {
+                "Импорт завершён: блюд ${result.importedMeals}, ингредиентов ${result.importedIngredients}"
+            } else {
+                "Ошибка импорта: ${result.error ?: "неизвестная ошибка"}"
+            }
+
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
 
     Scaffold(
@@ -234,6 +253,14 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
                     onClearAfterExportToggle = viewModel::updateClearShoppingAfterExport,
                     onExportDatabase = {
                         saveDatabaseExportLauncher.launch("meal-planner-export-${System.currentTimeMillis()}.json")
+                    },
+                    onImportDatabaseMerge = {
+                        importMode.value = false
+                        importDatabaseLauncher.launch(arrayOf("application/json", "text/json", "*/*"))
+                    },
+                    onImportDatabaseOverwrite = {
+                        importMode.value = true
+                        importDatabaseLauncher.launch(arrayOf("application/json", "text/json", "*/*"))
                     }
                 )
             }
