@@ -31,11 +31,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
@@ -47,6 +51,7 @@ import com.example.mealplanner.data.MealsRepository
 import com.example.mealplanner.model.Meal
 import com.example.mealplanner.viewmodel.MealFilterOptions
 import com.example.mealplanner.viewmodel.MealFilterState
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -72,13 +77,25 @@ fun MenuScreen(
     var newGroupName by remember { mutableStateOf("") }
     var groupError by remember { mutableStateOf<String?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var debouncedSearchQuery by rememberSaveable { mutableStateOf("") }
     var groupPendingDelete by remember { mutableStateOf<String?>(null) }
     var groupPendingEdit by remember { mutableStateOf<String?>(null) }
     var editGroupName by remember { mutableStateOf("") }
     var expandedGroups by rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var isFilterSheetVisible by rememberSaveable { mutableStateOf(false) }
 
-    val normalizedSearch = searchQuery.trim().lowercase()
+    LaunchedEffect(searchQuery) {
+        delay(300)
+        debouncedSearchQuery = searchQuery
+    }
+
+    val normalizedSearch = debouncedSearchQuery.trim().lowercase()
+    val mealsByGroup = groups.associateWith { group ->
+        meals.filter { meal ->
+            meal.group == group && (normalizedSearch.isBlank() || meal.name.lowercase().contains(normalizedSearch))
+        }
+    }
+    val hasSearchResults = mealsByGroup.values.any { it.isNotEmpty() }
 
     Column(
         modifier = Modifier
@@ -145,43 +162,51 @@ fun MenuScreen(
             Text(text = it, color = MaterialTheme.colorScheme.error)
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            groups.forEach { group ->
-                val mealsInGroup = meals.filter { meal ->
-                    meal.group == group && (normalizedSearch.isBlank() || meal.name.lowercase().contains(normalizedSearch))
-                }
-                val isExpanded = expandedGroups[group] ?: true
+        if (!hasSearchResults) {
+            SearchEmptyState(
+                hasQuery = normalizedSearch.isNotBlank(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                groups.forEach { group ->
+                    val mealsInGroup = mealsByGroup[group].orEmpty()
+                    val isExpanded = expandedGroups[group] ?: true
 
-                item(key = "group_$group") {
-                    GroupHeader(
-                        group = group,
-                        mealCount = mealsInGroup.size,
-                        isExpanded = isExpanded,
-                        canManage = group !in MealsRepository.DEFAULT_GROUPS && group != MealsRepository.UNCATEGORIZED_GROUP,
-                        onToggleExpanded = {
-                            expandedGroups = expandedGroups + (group to !isExpanded)
-                        },
-                        onEdit = {
-                            groupPendingEdit = group
-                            editGroupName = group
-                        },
-                        onDelete = { groupPendingDelete = group }
-                    )
-                }
-
-                items(mealsInGroup, key = { it.id }) { meal ->
-                    AnimatedVisibility(visible = isExpanded) {
-                        MealCard(
-                            modifier = Modifier.padding(start = 12.dp),
-                            meal = meal,
-                            groups = groups,
-                            onRemove = { onRemoveMeal(meal) },
-                            onMove = { target -> onMoveMealToGroup(meal, target) },
-                            onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
+                    item(key = "group_$group") {
+                        GroupHeader(
+                            group = group,
+                            mealCount = mealsInGroup.size,
+                            isExpanded = isExpanded,
+                            canManage = group !in MealsRepository.DEFAULT_GROUPS && group != MealsRepository.UNCATEGORIZED_GROUP,
+                            onToggleExpanded = {
+                                expandedGroups = expandedGroups + (group to !isExpanded)
+                            },
+                            onEdit = {
+                                groupPendingEdit = group
+                                editGroupName = group
+                            },
+                            onDelete = { groupPendingDelete = group }
                         )
+                    }
+
+                    items(mealsInGroup, key = { it.id }) { meal ->
+                        AnimatedVisibility(visible = isExpanded) {
+                            MealCard(
+                                modifier = Modifier.padding(start = 12.dp),
+                                meal = meal,
+                                groups = groups,
+                                searchQuery = normalizedSearch,
+                                onRemove = { onRemoveMeal(meal) },
+                                onMove = { target -> onMoveMealToGroup(meal, target) },
+                                onDuplicate = { target -> onDuplicateMealToGroup(meal, target) }
+                            )
+                        }
                     }
                 }
             }
@@ -424,6 +449,7 @@ private fun MealCard(
     modifier: Modifier = Modifier,
     meal: Meal,
     groups: List<String>,
+    searchQuery: String,
     onRemove: () -> Unit,
     onMove: (String) -> Unit,
     onDuplicate: (String) -> Unit
@@ -450,7 +476,10 @@ private fun MealCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = meal.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = highlightMatch(meal.name, searchQuery),
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Text("Ингредиентов: ${meal.ingredients.size}")
                 }
                 IconButton(onClick = onRemove) {
@@ -492,6 +521,65 @@ private fun MealCard(
             }
         }
     }
+}
+
+@Composable
+private fun SearchEmptyState(
+    hasQuery: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = if (hasQuery) "Ничего не найдено" else "Список блюд пуст",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = if (hasQuery) {
+                    "Попробуйте изменить запрос или сбросить фильтры."
+                } else {
+                    "Добавьте первое блюдо, чтобы начать планирование."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun highlightMatch(text: String, query: String) = buildAnnotatedString {
+    if (query.isBlank()) {
+        append(text)
+        return@buildAnnotatedString
+    }
+
+    val start = text.lowercase().indexOf(query.lowercase())
+    if (start < 0) {
+        append(text)
+        return@buildAnnotatedString
+    }
+
+    val end = start + query.length
+    append(text.substring(0, start))
+    pushStyle(
+        SpanStyle(
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1B5E20)
+        )
+    )
+    append(text.substring(start, end))
+    pop()
+    append(text.substring(end))
 }
 
 @Composable
