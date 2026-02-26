@@ -185,6 +185,7 @@ fun MealPlannerApp(viewModel: MealPlannerViewModel) {
             composable(Screen.ShoppingList.route) {
                 ShoppingListScreen(
                     ingredients = viewModel.getAggregatedShoppingList(),
+                    categoriesByStorageKey = viewModel.getShoppingIngredientCategoriesByStorageKey(),
                     dayCount = dayCount,
                     purchasedIngredientKeys = purchasedIngredientKeys,
                     onIngredientPurchasedChange = viewModel::setIngredientPurchased,

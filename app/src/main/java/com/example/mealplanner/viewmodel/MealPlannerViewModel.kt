@@ -630,6 +630,20 @@ class MealPlannerViewModel(
             .sortedBy { it.name }
     }
 
+    fun getShoppingIngredientCategoriesByStorageKey(): Map<String, String> {
+        val categoriesByPair = ingredientCatalog.value.associate { ingredient ->
+            (ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()) to
+                (ingredient.category?.trim().takeUnless { it.isNullOrBlank() } ?: OTHER_INGREDIENT_CATEGORY)
+        }
+
+        return getAggregatedShoppingList().associate { ingredient ->
+            val key = ingredient.storageKey()
+            val category = categoriesByPair[ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()]
+                ?: OTHER_INGREDIENT_CATEGORY
+            key to category
+        }
+    }
+
     fun buildShoppingListMessage(): String {
         val ingredients = getAggregatedShoppingList()
         if (ingredients.isEmpty()) return "Список покупок пуст"
