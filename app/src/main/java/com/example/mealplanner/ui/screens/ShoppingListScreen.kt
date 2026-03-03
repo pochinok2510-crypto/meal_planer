@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,7 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +71,8 @@ fun ShoppingListScreen(
     onSend: () -> Unit,
     onSavePdf: () -> Unit,
     onCheckAll: () -> Unit,
-    onUncheckAll: () -> Unit
+    onUncheckAll: () -> Unit,
+    bottomNavigationBar: @Composable () -> Unit
 ) {
     val density = LocalUiDensity.current
     val contentPadding = 10.dp * density.spacingMultiplier
@@ -85,7 +85,7 @@ fun ShoppingListScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
+            SmallTopAppBar(
                 title = { Text("Список покупок") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -103,10 +103,13 @@ fun ShoppingListScreen(
             )
         },
         bottomBar = {
-            ShoppingActionsBar(
-                onSend = onSend,
-                onSavePdf = onSavePdf
-            )
+            Column {
+                ShoppingActionsBar(
+                    onSend = onSend,
+                    onSavePdf = onSavePdf
+                )
+                bottomNavigationBar()
+            }
         }
     ) { innerPadding ->
         Column(
@@ -254,7 +257,6 @@ private fun ShoppingActionsBar(
         BottomAppBar(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
                 .imePadding(),
             containerColor = MaterialTheme.colorScheme.surface
         ) {
