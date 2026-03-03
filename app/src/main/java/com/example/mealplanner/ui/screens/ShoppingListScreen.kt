@@ -29,15 +29,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -84,7 +84,7 @@ fun ShoppingListScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            SmallTopAppBar(
+            TopAppBar(
                 title = { Text("Список покупок") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -138,7 +138,7 @@ fun ShoppingListScreen(
             Box(modifier = Modifier.weight(1f)) {
                 if (!hasIngredients) {
                     if (animationsEnabled) {
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
@@ -173,7 +173,7 @@ fun ShoppingListScreen(
                     }
 
                     if (animationsEnabled) {
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
@@ -353,7 +353,7 @@ private fun CategorySection(
                     }
 
                     if (index != group.ingredients.lastIndex) {
-                        Divider(modifier = Modifier.padding(horizontal = 12.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                     }
                 }
             }
