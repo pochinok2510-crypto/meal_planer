@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -253,25 +253,33 @@ private fun ShoppingActionsBar(
     onSend: () -> Unit,
     onSavePdf: () -> Unit
 ) {
-    Surface(shadowElevation = 6.dp) {
-        BottomAppBar(
+    Surface(
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .imePadding(),
-            containerColor = MaterialTheme.colorScheme.surface
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
+            Button(
+                onClick = onSend,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .weight(1f)
+                    .height(48.dp)
             ) {
-                Button(onClick = onSend, modifier = Modifier.weight(1f)) {
-                    Text("Отправить")
-                }
-                OutlinedButton(onClick = onSavePdf, modifier = Modifier.weight(1f)) {
-                    Text("PDF")
-                }
+                Text("Отправить")
+            }
+            OutlinedButton(
+                onClick = onSavePdf,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+            ) {
+                Text("PDF")
             }
         }
     }
