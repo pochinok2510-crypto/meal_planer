@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -31,8 +33,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,15 +47,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.model.Ingredient
-import com.example.mealplanner.ui.presentation.toRussianUnitLabel
 import com.example.mealplanner.ui.presentation.LocalUiDensity
-import java.util.Locale
+import com.example.mealplanner.ui.presentation.toRussianUnitLabel
+import com.example.mealplanner.viewmodel.ShoppingGroup
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShoppingListScreen(
-    ingredients: List<Ingredient>,
-    categoriesByStorageKey: Map<String, String>,
+    groupedIngredients: List<ShoppingGroup>,
     dayCount: Int,
     animationsEnabled: Boolean,
     purchasedIngredientKeys: Set<String>,
@@ -67,15 +71,8 @@ fun ShoppingListScreen(
     val sectionSpacing = 12.dp * density.spacingMultiplier
     val minCardHeight = 64.dp * density.cardHeightMultiplier
     val showSendOptions = remember { mutableStateOf(false) }
-    val groupedIngredients = remember(ingredients, categoriesByStorageKey) {
-        ingredients.groupBy { ingredient ->
-            categoriesByStorageKey[ingredient.storageKey()] ?: DEFAULT_CATEGORY
-        }
-    }
-    val orderedCategories = remember(groupedIngredients) {
-        groupedIngredients.keys
-            .sortedWith(compareBy<String> { it == DEFAULT_CATEGORY }.thenBy { it.lowercase(Locale.getDefault()) })
-    }
+    var collapsedGroups by rememberSaveable { mutableStateOf(setOf<String>()) }
+    val hasIngredients = groupedIngredients.any { it.ingredients.isNotEmpty() }
 
     Column(
         modifier = Modifier
@@ -85,8 +82,8 @@ fun ShoppingListScreen(
     ) {
         Row(
             modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = minCardHeight),
+                .fillMaxWidth()
+                .heightIn(min = minCardHeight),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -99,19 +96,19 @@ fun ShoppingListScreen(
 
         if (animationsEnabled) {
             AnimatedVisibility(
-                visible = ingredients.isEmpty(),
+                visible = !hasIngredients,
                 enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
                 exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
             ) {
                 Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
             }
-        } else if (ingredients.isEmpty()) {
+        } else if (!hasIngredients) {
             Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
         }
 
         if (animationsEnabled) {
             AnimatedVisibility(
-                visible = ingredients.isNotEmpty(),
+                visible = hasIngredients,
                 enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
                 exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
             ) {
@@ -119,40 +116,44 @@ fun ShoppingListScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    orderedCategories.forEach { category ->
-                        val categoryIngredients = groupedIngredients[category].orEmpty()
-                        if (categoryIngredients.isNotEmpty()) {
-                            item(key = "category-$category") {
-                                CategorySection(
-                                    category = category,
-                                    ingredients = categoryIngredients,
-                                    purchasedIngredientKeys = purchasedIngredientKeys,
-                                    onIngredientPurchasedChange = onIngredientPurchasedChange,
-                                    onRemoveIngredient = onRemoveIngredient
-                                )
-                            }
-                        }
+                    items(groupedIngredients, key = { it.groupId }) { group ->
+                        CategorySection(
+                            group = group,
+                            purchasedIngredientKeys = purchasedIngredientKeys,
+                            isCollapsed = group.groupId in collapsedGroups,
+                            onToggleCollapsed = {
+                                collapsedGroups = if (group.groupId in collapsedGroups) {
+                                    collapsedGroups - group.groupId
+                                } else {
+                                    collapsedGroups + group.groupId
+                                }
+                            },
+                            onIngredientPurchasedChange = onIngredientPurchasedChange,
+                            onRemoveIngredient = onRemoveIngredient
+                        )
                     }
                 }
             }
-        } else if (ingredients.isNotEmpty()) {
+        } else if (hasIngredients) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                orderedCategories.forEach { category ->
-                    val categoryIngredients = groupedIngredients[category].orEmpty()
-                    if (categoryIngredients.isNotEmpty()) {
-                        item(key = "category-$category") {
-                            CategorySection(
-                                category = category,
-                                ingredients = categoryIngredients,
-                                purchasedIngredientKeys = purchasedIngredientKeys,
-                                onIngredientPurchasedChange = onIngredientPurchasedChange,
-                                onRemoveIngredient = onRemoveIngredient
-                            )
-                        }
-                    }
+                items(groupedIngredients, key = { it.groupId }) { group ->
+                    CategorySection(
+                        group = group,
+                        purchasedIngredientKeys = purchasedIngredientKeys,
+                        isCollapsed = group.groupId in collapsedGroups,
+                        onToggleCollapsed = {
+                            collapsedGroups = if (group.groupId in collapsedGroups) {
+                                collapsedGroups - group.groupId
+                            } else {
+                                collapsedGroups + group.groupId
+                            }
+                        },
+                        onIngredientPurchasedChange = onIngredientPurchasedChange,
+                        onRemoveIngredient = onRemoveIngredient
+                    )
                 }
             }
         }
@@ -208,15 +209,16 @@ fun ShoppingListScreen(
 
 @Composable
 private fun CategorySection(
-    category: String,
-    ingredients: List<Ingredient>,
+    group: ShoppingGroup,
     purchasedIngredientKeys: Set<String>,
+    isCollapsed: Boolean,
+    onToggleCollapsed: () -> Unit,
     onIngredientPurchasedChange: (Ingredient, Boolean) -> Unit,
     onRemoveIngredient: (Ingredient) -> Unit
 ) {
     val density = LocalUiDensity.current
     val minCardHeight = 64.dp * density.cardHeightMultiplier
-    val accentColor = categoryAccentColor(category)
+    val accentColor = categoryAccentColor(group.groupName)
 
     Card(
         modifier = Modifier
@@ -231,6 +233,7 @@ private fun CategorySection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(onClick = onToggleCollapsed)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -243,39 +246,49 @@ private fun CategorySection(
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = category,
+                text = group.groupName,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
             )
+            Text(if (isCollapsed) "▸" else "▾")
         }
 
-        ingredients.forEachIndexed { index, ingredient ->
-            val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = isPurchased,
-                    onCheckedChange = { checked ->
-                        onIngredientPurchasedChange(ingredient, checked)
+        AnimatedVisibility(
+            visible = !isCollapsed,
+            enter = expandVertically(tween(220)) + fadeIn(tween(180)),
+            exit = shrinkVertically(tween(200)) + fadeOut(tween(120))
+        ) {
+            Column {
+                group.ingredients.forEachIndexed { index, ingredient ->
+                    val isPurchased = ingredient.storageKey() in purchasedIngredientKeys
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isPurchased,
+                            onCheckedChange = { checked ->
+                                onIngredientPurchasedChange(ingredient, checked)
+                            }
+                        )
+                        Text(
+                            text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit.toRussianUnitLabel()}",
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .weight(1f)
+                        )
+                        IconButton(onClick = { onRemoveIngredient(ingredient) }) {
+                            Text("🗑️")
+                        }
                     }
-                )
-                Text(
-                    text = "${ingredient.name}: ${ingredient.amount} ${ingredient.unit.toRussianUnitLabel()}",
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .weight(1f)
-                )
-                IconButton(onClick = { onRemoveIngredient(ingredient) }) {
-                    Text("🗑️")
-                }
-            }
 
-            if (index != ingredients.lastIndex) {
-                Divider(modifier = Modifier.padding(horizontal = 12.dp))
+                    if (index != group.ingredients.lastIndex) {
+                        Divider(modifier = Modifier.padding(horizontal = 12.dp))
+                    }
+                }
             }
         }
     }
@@ -293,8 +306,4 @@ private fun categoryAccentColor(category: String): Color {
     return accents[index]
 }
 
-private fun Ingredient.storageKey(): String {
-    return "${name.trim().lowercase(Locale.getDefault())}|${unit.trim().lowercase(Locale.getDefault())}"
-}
-
-private const val DEFAULT_CATEGORY = "Other"
+private fun Ingredient.storageKey(): String = "${name.trim().lowercase()}|${unit.trim().lowercase()}"

@@ -60,6 +60,7 @@ fun MealPlannerApp(
     val addMealState by mealPlannerViewModel.addMealUiState.collectAsState()
     val groupedFilteredIngredientCatalog by mealPlannerViewModel.groupedFilteredIngredientCatalog.collectAsState()
     val ingredientGroups by mealPlannerViewModel.ingredientGroups.collectAsState()
+    val groupedShoppingList by mealPlannerViewModel.groupedShoppingList.collectAsState()
     val undoUiState by mealPlannerViewModel.undoUiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -242,8 +243,7 @@ fun MealPlannerApp(
             }
             composable(Screen.ShoppingList.route) {
                 ShoppingListScreen(
-                    ingredients = mealPlannerViewModel.getAggregatedShoppingList(),
-                    categoriesByStorageKey = mealPlannerViewModel.getShoppingIngredientCategoriesByStorageKey(),
+                    groupedIngredients = groupedShoppingList,
                     dayCount = dayCount,
                     animationsEnabled = settings.animationsEnabled,
                     purchasedIngredientKeys = purchasedIngredientKeys,

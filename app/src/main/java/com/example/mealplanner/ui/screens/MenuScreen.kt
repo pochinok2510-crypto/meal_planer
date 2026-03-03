@@ -23,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -88,6 +89,7 @@ fun MenuScreen(
     var editGroupName by remember { mutableStateOf("") }
     var expandedGroups by rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var isFilterSheetVisible by rememberSaveable { mutableStateOf(false) }
+    var isSearchAndFiltersExpanded by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(searchQuery) {
         delay(300)
@@ -108,28 +110,72 @@ fun MenuScreen(
             .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(sectionSpacing)
     ) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Поиск блюд") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isSearchAndFiltersExpanded = !isSearchAndFiltersExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Поиск и фильтры", style = MaterialTheme.typography.titleSmall)
+                    Text(if (isSearchAndFiltersExpanded) "▾" else "▸")
+                }
+
+                AnimatedVisibility(visible = isSearchAndFiltersExpanded) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            label = { Text("Поиск блюд") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { isFilterSheetVisible = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Фильтры")
+                            }
+                            TextButton(
+                                onClick = {
+                                    searchQuery = ""
+                                    debouncedSearchQuery = ""
+                                    onClearMealFilters()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Сбросить")
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(
-                onClick = { isFilterSheetVisible = true },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Фильтры")
+            mealFilterState.selectedGroup?.let {
+                AssistChip(onClick = { onMealFilterGroupSelect(null) }, label = { Text("Группа: $it") })
             }
-            TextButton(
-                onClick = onClearMealFilters,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Сбросить фильтры")
+            mealFilterState.selectedIngredient?.let {
+                AssistChip(onClick = { onMealFilterIngredientSelect(null) }, label = { Text("Ингр.: $it") })
+            }
+            mealFilterState.selectedCategory?.let {
+                AssistChip(onClick = { onMealFilterCategorySelect(null) }, label = { Text("Кат.: $it") })
             }
         }
 
