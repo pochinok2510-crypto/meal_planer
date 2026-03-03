@@ -219,8 +219,8 @@ class MealPlannerViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private data class ShoppingCatalogState(
-        val catalog: List<Ingredient>,
-        val groups: List<com.example.mealplanner.model.IngredientGroup>,
+        val catalog: List<com.example.mealplanner.data.local.Ingredient>,
+        val groups: List<com.example.mealplanner.data.local.IngredientGroup>,
         val hiddenKeys: Set<String>
     )
 
@@ -242,9 +242,9 @@ class MealPlannerViewModel(
             meals = meals,
             weeklyPlan = weeklyPlan,
             dayCount = dayCount,
-            ingredientCatalog = shoppingState.catalog,
-            ingredientGroups = shoppingState.groups,
-            hiddenIngredientKeys = shoppingState.hiddenKeys
+            catalog = shoppingState.catalog,
+            groups = shoppingState.groups,
+            hiddenKeys = shoppingState.hiddenKeys
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
