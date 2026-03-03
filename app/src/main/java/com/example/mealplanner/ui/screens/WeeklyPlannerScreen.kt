@@ -1,10 +1,14 @@
 package com.example.mealplanner.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,8 +29,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +61,7 @@ fun WeeklyPlannerScreen(
             }
         }
     }
+    var expandedDays by remember { mutableStateOf(setOf<PlanDay>()) }
 
     LazyColumn(
         modifier = Modifier
@@ -68,6 +73,7 @@ fun WeeklyPlannerScreen(
             items = PlanDay.entries.toList(),
             key = { day -> day.name }
         ) { day ->
+            val isExpanded = day in expandedDays
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -79,52 +85,74 @@ fun WeeklyPlannerScreen(
                         .padding(cardPadding),
                     verticalArrangement = Arrangement.spacedBy(rowSpacing)
                 ) {
-                    Text(day.title, style = MaterialTheme.typography.titleMedium)
-                    var draggingIndex by remember(day) { mutableStateOf<Int?>(null) }
-                    val orderedSlots = daySlotOrder[day].orEmpty()
-                    orderedSlots.forEachIndexed { index, slot ->
-                        val assignedId = weeklyPlan[day to slot]
-                        val mealOptions = meals.filter { it.group == slot.title }.ifEmpty { meals }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .pointerInput(orderedSlots) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            draggingIndex = index
-                                        },
-                                        onDragEnd = {
-                                            draggingIndex = null
-                                        },
-                                        onDragCancel = {
-                                            draggingIndex = null
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            val currentIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
-                                            if (dragAmount.y > 20f && currentIndex < orderedSlots.lastIndex) {
-                                                daySlotOrder[day] = orderedSlots.toMutableList().apply {
-                                                    add(currentIndex + 1, removeAt(currentIndex))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                expandedDays = if (isExpanded) expandedDays - day else expandedDays + day
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(day.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = if (isExpanded) "▾" else "▸",
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = isExpanded,
+                        enter = expandVertically(animationSpec = tween(230)) + fadeIn(animationSpec = tween(200)),
+                        exit = shrinkVertically(animationSpec = tween(220)) + fadeOut(animationSpec = tween(160))
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(rowSpacing)) {
+                            var draggingIndex by remember(day) { mutableStateOf<Int?>(null) }
+                            val orderedSlots = daySlotOrder[day].orEmpty()
+                            orderedSlots.forEachIndexed { index, slot ->
+                                val assignedId = weeklyPlan[day to slot]
+                                val mealOptions = meals.filter { it.group == slot.title }.ifEmpty { meals }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .pointerInput(orderedSlots) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    draggingIndex = index
+                                                },
+                                                onDragEnd = {
+                                                    draggingIndex = null
+                                                },
+                                                onDragCancel = {
+                                                    draggingIndex = null
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    val currentIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                                    if (dragAmount.y > 20f && currentIndex < orderedSlots.lastIndex) {
+                                                        daySlotOrder[day] = orderedSlots.toMutableList().apply {
+                                                            add(currentIndex + 1, removeAt(currentIndex))
+                                                        }
+                                                        draggingIndex = currentIndex + 1
+                                                    } else if (dragAmount.y < -20f && currentIndex > 0) {
+                                                        daySlotOrder[day] = orderedSlots.toMutableList().apply {
+                                                            add(currentIndex - 1, removeAt(currentIndex))
+                                                        }
+                                                        draggingIndex = currentIndex - 1
+                                                    }
                                                 }
-                                                draggingIndex = currentIndex + 1
-                                            } else if (dragAmount.y < -20f && currentIndex > 0) {
-                                                daySlotOrder[day] = orderedSlots.toMutableList().apply {
-                                                    add(currentIndex - 1, removeAt(currentIndex))
-                                                }
-                                                draggingIndex = currentIndex - 1
-                                            }
-                                        }
+                                            )
+                                        },
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("⋮⋮", modifier = Modifier.padding(top = 16.dp))
+                                    MealSelectorRow(
+                                        slot = slot,
+                                        selectedMealId = assignedId,
+                                        mealOptions = mealOptions,
+                                        onAssign = { onAssignMeal(day, slot, it) }
                                     )
-                                },
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("⋮⋮", modifier = Modifier.padding(top = 16.dp))
-                            MealSelectorRow(
-                                slot = slot,
-                                selectedMealId = assignedId,
-                                mealOptions = mealOptions,
-                                onAssign = { onAssignMeal(day, slot, it) }
-                            )
+                                }
+                            }
                         }
                     }
                 }

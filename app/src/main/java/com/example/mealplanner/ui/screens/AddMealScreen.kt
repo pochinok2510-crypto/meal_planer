@@ -491,31 +491,43 @@ private fun IngredientSheet(
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                groupedFilteredIngredients.forEach { (category, ingredients) ->
-                    item(key = "header_$category") {
+                val entries = groupedFilteredIngredients.entries.toList()
+                val hasItems = entries.any { it.value.isNotEmpty() }
+
+                if (!hasItems) {
+                    item(key = "group_empty_state") {
                         Text(
-                            text = category,
-                            modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp)
+                            text = "В этой группе пока нет ингредиентов",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp)
                         )
                     }
-                    items(items = ingredients, key = { item -> item.id }) { ingredient ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                } else {
+                    entries.forEach { (category, ingredients) ->
+                        item(key = "header_$category") {
                             Text(
-                                text = "${ingredient.name} (${ingredient.unit.toRussianUnitLabel()})",
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        onIngredientSelect(ingredient.name, ingredient.unit)
-                                    }
-                                    .padding(vertical = 8.dp)
+                                text = category,
+                                modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp)
                             )
-                            IconButton(onClick = { ingredientToDelete = ingredient }) {
-                                Text("🗑️")
+                        }
+                        items(items = ingredients, key = { item -> item.id }) { ingredient ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${ingredient.name} (${ingredient.unit.toRussianUnitLabel()})",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            onIngredientSelect(ingredient.name, ingredient.unit)
+                                        }
+                                        .padding(vertical = 8.dp)
+                                )
+                                IconButton(onClick = { ingredientToDelete = ingredient }) {
+                                    Text("🗑️")
+                                }
                             }
                         }
                     }

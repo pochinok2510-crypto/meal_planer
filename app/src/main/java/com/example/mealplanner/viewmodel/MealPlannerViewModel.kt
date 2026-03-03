@@ -78,6 +78,12 @@ data class MealFilterOptions(
     val categories: List<String> = emptyList()
 )
 
+data class ShoppingGroup(
+    val groupId: String,
+    val groupName: String,
+    val ingredients: List<Ingredient>
+)
+
 private sealed interface PendingUndoAction {
     data class DraftIngredientRemoval(
         val ingredient: MealIngredientDraft,
@@ -165,34 +171,67 @@ class MealPlannerViewModel(
         .map { it.ingredientSearchQuery }
         .distinctUntilChanged()
 
-    val filteredIngredientCatalog = combine(ingredientCatalog, ingredientSearchQuery) { catalog, searchQuery ->
+    private val selectedIngredientGroupId = _addMealUiState
+        .map { it.ingredientGroupId }
+        .distinctUntilChanged()
+
+    private fun resolveIngredientGroupId(
+        requestedGroupId: String,
+        groups: List<com.example.mealplanner.data.local.IngredientGroup>
+    ): String {
+        val defaultGroupId = groups.firstOrNull {
+            it.name.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true)
+        }?.id ?: IngredientRepository.DEFAULT_GROUP_ID
+
+        return when {
+            requestedGroupId.isBlank() -> defaultGroupId
+            groups.any { it.id == requestedGroupId } -> requestedGroupId
+            else -> defaultGroupId
+        }
+    }
+
+    val filteredIngredientCatalog = combine(
+        ingredientCatalog,
+        ingredientSearchQuery,
+        selectedIngredientGroupId,
+        ingredientGroups
+    ) { catalog, searchQuery, groupId, groups ->
         val query = searchQuery.trim()
+        val resolvedGroupId = resolveIngredientGroupId(groupId, groups)
+        val byGroup = catalog.filter { ingredient -> ingredient.groupId == resolvedGroupId }
         if (query.isBlank()) {
-            catalog.take(40)
+            byGroup.take(40)
         } else {
-            catalog.filter { ingredient -> ingredient.name.contains(query, ignoreCase = true) }.take(40)
+            byGroup.filter { ingredient -> ingredient.name.contains(query, ignoreCase = true) }.take(40)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val groupedFilteredIngredientCatalog = combine(filteredIngredientCatalog, ingredientGroups) { catalog, groups ->
-        val groupNameById = groups.associate { it.id to it.name }
-        val grouped = catalog.groupBy { ingredient ->
-            groupNameById[ingredient.groupId] ?: IngredientRepository.DEFAULT_GROUP_NAME
-        }
+    val selectedIngredientGroupName = combine(selectedIngredientGroupId, ingredientGroups) { groupId, groups ->
+        val resolvedGroupId = resolveIngredientGroupId(groupId, groups)
+        groups.firstOrNull { it.id == resolvedGroupId }?.name ?: IngredientRepository.DEFAULT_GROUP_NAME
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IngredientRepository.DEFAULT_GROUP_NAME)
 
-        val orderedCategories = grouped.keys
-            .filterNot { it.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }
-            .sortedBy { it.lowercase(Locale.getDefault()) }
-
-        buildMap {
-            orderedCategories.forEach { category ->
-                put(category, grouped.getValue(category))
-            }
-            grouped.entries.firstOrNull { it.key.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }
-                ?.value
-                ?.let { otherIngredients -> put(IngredientRepository.DEFAULT_GROUP_NAME, otherIngredients) }
-        }
+    val groupedFilteredIngredientCatalog = combine(
+        filteredIngredientCatalog,
+        selectedIngredientGroupName
+    ) { catalog, groupName ->
+        mapOf(groupName to catalog)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val groupedShoppingList = combine(
+        _meals,
+        _weeklyPlan,
+        _dayCount,
+        ingredientCatalog,
+        ingredientGroups,
+        _hiddenShoppingIngredientKeys
+    ) { meals, weeklyPlan, dayCount, catalog, groups, hiddenKeys ->
+        buildGroupedShoppingList(meals, weeklyPlan, dayCount, catalog, groups, hiddenKeys)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val aggregatedShoppingList = groupedShoppingList
+        .map { sections -> sections.flatMap { it.ingredients } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val menuMealFilterOptions = combine(_meals, _groups, ingredientCatalog, ingredientGroups) { meals, groups, catalog, ingredientGroups ->
         val groupNameById = ingredientGroups.associate { it.id to it.name }
@@ -394,13 +433,10 @@ class MealPlannerViewModel(
 
     fun openIngredientSheet() {
         val groups = ingredientGroups.value
-        val defaultGroupId = groups.firstOrNull { it.name.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }?.id
-            ?: groups.firstOrNull()?.id
-            ?: ""
         updateAddMealState {
             it.copy(
                 isIngredientSheetVisible = true,
-                ingredientGroupId = if (it.ingredientGroupId.isNotBlank()) it.ingredientGroupId else defaultGroupId,
+                ingredientGroupId = resolveIngredientGroupId(it.ingredientGroupId, groups),
                 error = null
             )
         }
@@ -473,7 +509,8 @@ class MealPlannerViewModel(
     }
 
     fun updateIngredientGroupSelection(groupId: String) {
-        updateAddMealState { it.copy(ingredientGroupId = groupId, error = null) }
+        val resolvedGroupId = resolveIngredientGroupId(groupId, ingredientGroups.value)
+        updateAddMealState { it.copy(ingredientGroupId = resolvedGroupId, error = null) }
     }
 
     fun confirmIngredientFromSheet(): Boolean {
@@ -768,73 +805,16 @@ class MealPlannerViewModel(
         persistPlannerStateIfEnabled()
     }
 
-    fun getAggregatedShoppingList(): List<Ingredient> {
-        val mealMap = meals.value.associateBy { it.id }
-        val ingredientIdByKey = ingredientCatalog.value.associateBy(
-            keySelector = { ingredient -> ingredient.name.normalizedKey() to ingredient.unit.normalizedKey() },
-            valueTransform = { ingredient -> ingredient.id }
-        )
-
-        val multiplier = BigDecimal.valueOf(dayCount.value.toLong())
-
-        val grouped = weeklyPlan.value.values
-            .mapNotNull { mealId -> mealMap[mealId] }
-            .flatMap { meal ->
-                meal.ingredients.map { ingredient ->
-                    val normalizedName = ingredient.name.normalizedKey()
-                    val normalizedUnit = ingredient.unit.normalizedKey()
-                    val ingredientId = ingredientIdByKey[normalizedName to normalizedUnit]
-                        ?: syntheticIngredientId(normalizedName, normalizedUnit)
-                    ShoppingIngredientItem(
-                        ingredientId = ingredientId,
-                        displayName = ingredient.name.trim(),
-                        normalizedName = normalizedName,
-                        displayUnit = ingredient.unit.trim(),
-                        normalizedUnit = normalizedUnit,
-                        amount = BigDecimal.valueOf(ingredient.amount)
-                    )
-                }
-            }
-            .groupBy { item -> item.ingredientId }
-
-        return grouped.values
-            .mapNotNull { items ->
-                val first = items.firstOrNull() ?: return@mapNotNull null
-                val totalAmount = items
-                    .fold(BigDecimal.ZERO) { acc, item -> acc + item.amount }
-                    .multiply(multiplier)
-                    .setScale(2, RoundingMode.HALF_UP)
-
-                Ingredient(
-                    name = first.displayName.ifBlank {
-                        first.normalizedName.replaceFirstChar {
-                            if (it.isLowerCase()) it.titlecase() else it.toString()
-                        }
-                    },
-                    amount = totalAmount.toDouble(),
-                    unit = first.displayUnit.ifBlank { first.normalizedUnit }
-                )
-            }
-            .filterNot { ingredient -> ingredient.storageKey() in _hiddenShoppingIngredientKeys.value }
-            .sortedBy { it.name }
-    }
+    fun getAggregatedShoppingList(): List<Ingredient> = aggregatedShoppingList.value
 
     fun getShoppingIngredientCategoriesByStorageKey(): Map<String, String> {
-        val categoriesByPair = ingredientCatalog.value.associate { ingredient ->
-            (ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()) to
-                (IngredientRepository.DEFAULT_GROUP_NAME)
-        }
-
-        return getAggregatedShoppingList().associate { ingredient ->
-            val key = ingredient.storageKey()
-            val category = categoriesByPair[ingredient.name.normalizedKey() to ingredient.unit.normalizedKey()]
-                ?: IngredientRepository.DEFAULT_GROUP_NAME
-            key to category
-        }
+        return groupedShoppingList.value
+            .flatMap { group -> group.ingredients.map { ingredient -> ingredient.storageKey() to group.groupName } }
+            .toMap()
     }
 
     fun buildShoppingListMessage(): String {
-        val ingredients = getAggregatedShoppingList()
+        val ingredients = aggregatedShoppingList.value
         if (ingredients.isEmpty()) return "Список покупок пуст"
 
         val title = "Список покупок на ${dayCount.value} дн."
@@ -843,7 +823,7 @@ class MealPlannerViewModel(
     }
 
     fun createSharePdfFile(): File? {
-        val ingredients = getAggregatedShoppingList()
+        val ingredients = aggregatedShoppingList.value
         if (ingredients.isEmpty()) return null
 
         val outputFile = File(
@@ -859,7 +839,7 @@ class MealPlannerViewModel(
     }
 
     fun saveShoppingListPdfToUri(uri: Uri): Boolean {
-        val ingredients = getAggregatedShoppingList()
+        val ingredients = aggregatedShoppingList.value
         if (ingredients.isEmpty()) return false
 
         val resolver = getApplication<Application>().contentResolver
@@ -947,6 +927,88 @@ class MealPlannerViewModel(
         }
     }
 
+    private fun buildGroupedShoppingList(
+        meals: List<Meal>,
+        weeklyPlan: Map<Pair<PlanDay, MealSlot>, String>,
+        dayCount: Int,
+        catalog: List<com.example.mealplanner.data.local.Ingredient>,
+        groups: List<com.example.mealplanner.data.local.IngredientGroup>,
+        hiddenKeys: Set<String>
+    ): List<ShoppingGroup> {
+        val mealMap = meals.associateBy { it.id }
+        val catalogByPair = catalog.associateBy {
+            it.name.normalizedKey() to it.unit.normalizedKey()
+        }
+        val groupNameById = groups.associate { it.id to it.name }
+        val defaultGroupId = groups.firstOrNull {
+            it.name.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true)
+        }?.id ?: IngredientRepository.DEFAULT_GROUP_ID
+        val multiplier = BigDecimal.valueOf(dayCount.toLong())
+
+        val aggregatedItems = weeklyPlan.values
+            .mapNotNull { mealId -> mealMap[mealId] }
+            .flatMap { meal ->
+                meal.ingredients.map { ingredient ->
+                    val normalizedName = ingredient.name.normalizedKey()
+                    val normalizedUnit = ingredient.unit.normalizedKey()
+                    val catalogMatch = catalogByPair[normalizedName to normalizedUnit]
+                    val ingredientId = catalogMatch?.id ?: syntheticIngredientId(normalizedName, normalizedUnit)
+                    ShoppingIngredientItem(
+                        ingredientId = ingredientId,
+                        displayName = ingredient.name.trim(),
+                        normalizedName = normalizedName,
+                        displayUnit = ingredient.unit.trim(),
+                        normalizedUnit = normalizedUnit,
+                        amount = BigDecimal.valueOf(ingredient.amount),
+                        groupId = catalogMatch?.groupId ?: defaultGroupId,
+                        groupName = groupNameById[catalogMatch?.groupId] ?: IngredientRepository.DEFAULT_GROUP_NAME
+                    )
+                }
+            }
+            .groupBy { item -> item.ingredientId }
+            .values
+            .mapNotNull { items ->
+                val first = items.firstOrNull() ?: return@mapNotNull null
+                val totalAmount = items
+                    .fold(BigDecimal.ZERO) { acc, item -> acc + item.amount }
+                    .multiply(multiplier)
+                    .setScale(2, RoundingMode.HALF_UP)
+
+                val ingredient = Ingredient(
+                    name = first.displayName.ifBlank {
+                        first.normalizedName.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase() else it.toString()
+                        }
+                    },
+                    amount = totalAmount.toDouble(),
+                    unit = first.displayUnit.ifBlank { first.normalizedUnit }
+                )
+
+                if (ingredient.storageKey() in hiddenKeys) {
+                    null
+                } else {
+                    first.groupId to ShoppingGroupIngredient(first.groupName, ingredient)
+                }
+            }
+
+        return aggregatedItems
+            .groupBy({ it.first }, { it.second })
+            .map { (groupId, items) ->
+                val groupName = items.firstOrNull()?.groupName ?: IngredientRepository.DEFAULT_GROUP_NAME
+                ShoppingGroup(
+                    groupId = groupId,
+                    groupName = groupName,
+                    ingredients = items
+                        .map { it.ingredient }
+                        .sortedBy { it.name.lowercase(Locale.getDefault()) }
+                )
+            }
+            .sortedWith(
+                compareBy<ShoppingGroup> { it.groupName.equals(IngredientRepository.DEFAULT_GROUP_NAME, ignoreCase = true) }
+                    .thenBy { it.groupName.lowercase(Locale.getDefault()) }
+            )
+    }
+
     private fun writePdf(ingredients: List<Ingredient>, output: java.io.OutputStream) {
         val document = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
@@ -975,7 +1037,14 @@ class MealPlannerViewModel(
         val normalizedName: String,
         val displayUnit: String,
         val normalizedUnit: String,
-        val amount: BigDecimal
+        val amount: BigDecimal,
+        val groupId: String,
+        val groupName: String
+    )
+
+    private data class ShoppingGroupIngredient(
+        val groupName: String,
+        val ingredient: Ingredient
     )
 
     private fun String.normalizedKey(): String {
