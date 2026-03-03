@@ -10,21 +10,32 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,6 +46,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -44,9 +56,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.mealplanner.data.IngredientRepository
@@ -421,21 +435,58 @@ private fun IngredientSheet(
         else listOf(selectedUnit) + SUPPORTED_UNITS
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
+    val scope = rememberCoroutineScope()
+    val searchBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val newGroupBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val quantityBringIntoViewRequester = remember { BringIntoViewRequester() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        windowInsets = WindowInsets.ime
+    ) {
+        Scaffold(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Добавление ингредиента")
+                .imePadding(),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
+                        Text("Добавить")
+                    }
+                }
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp)
+                    .padding(top = 8.dp)
+                    .padding(innerPadding),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("Добавление ингредиента")
 
-            OutlinedTextField(
-                value = state.ingredientSearchQuery,
-                onValueChange = onIngredientSearchChange,
-                label = { Text("Поиск или новый ингредиент") },
-                modifier = Modifier.fillMaxWidth()
-            )
+                OutlinedTextField(
+                    value = state.ingredientSearchQuery,
+                    onValueChange = onIngredientSearchChange,
+                    label = { Text("Поиск или новый ингредиент") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(searchBringIntoViewRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch { searchBringIntoViewRequester.bringIntoView() }
+                            }
+                        }
+                )
 
             ExposedDropdownMenuBox(
                 expanded = ingredientGroupExpanded,
@@ -468,29 +519,36 @@ private fun IngredientSheet(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = newGroupName,
-                    onValueChange = { newGroupName = it },
-                    label = { Text("Новая группа") },
-                    modifier = Modifier.weight(1f)
-                )
-                Button(onClick = {
-                    if (onCreateGroup(newGroupName)) {
-                        newGroupName = ""
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = newGroupName,
+                        onValueChange = { newGroupName = it },
+                        label = { Text("Новая группа") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .bringIntoViewRequester(newGroupBringIntoViewRequester)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    scope.launch { newGroupBringIntoViewRequester.bringIntoView() }
+                                }
+                            }
+                    )
+                    Button(onClick = {
+                        if (onCreateGroup(newGroupName)) {
+                            newGroupName = ""
+                        }
+                    }) {
+                        Text("Создать")
                     }
-                }) {
-                    Text("Создать")
                 }
-            }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp, max = 280.dp)
-                    .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 220.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(vertical = 2.dp)
+                ) {
                 val entries = groupedFilteredIngredients.entries.toList()
                 val hasItems = entries.any { it.value.isNotEmpty() }
 
@@ -565,12 +623,20 @@ private fun IngredientSheet(
                 }
             }
 
-            OutlinedTextField(
-                value = state.ingredientQuantityInput,
-                onValueChange = onQuantityChange,
-                label = { Text("Количество") },
-                modifier = Modifier.fillMaxWidth()
-            )
+                OutlinedTextField(
+                    value = state.ingredientQuantityInput,
+                    onValueChange = onQuantityChange,
+                    label = { Text("Количество") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(quantityBringIntoViewRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch { quantityBringIntoViewRequester.bringIntoView() }
+                            }
+                        }
+                )
 
             Text("Удаление групп")
             ingredientGroups.forEach { group ->
@@ -586,8 +652,7 @@ private fun IngredientSheet(
                 }
             }
 
-            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
-                Text("Добавить")
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
