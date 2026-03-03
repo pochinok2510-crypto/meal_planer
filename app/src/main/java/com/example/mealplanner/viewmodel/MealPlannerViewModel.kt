@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -247,10 +248,6 @@ class MealPlannerViewModel(
             hiddenKeys = shoppingState.hiddenKeys
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val aggregatedShoppingList = groupedShoppingList
-        .map { sections -> sections.flatMap { it.ingredients } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val menuMealFilterOptions = combine(_meals, _groups, ingredientCatalog, ingredientGroups) { meals, groups, catalog, ingredientGroups ->
         val groupNameById = ingredientGroups.associate { it.id to it.name }
@@ -824,7 +821,7 @@ class MealPlannerViewModel(
         persistPlannerStateIfEnabled()
     }
 
-    fun getAggregatedShoppingList(): List<Ingredient> = aggregatedShoppingList.value
+    fun getShoppingList(): List<Ingredient> = groupedShoppingList.value.flatMap { it.ingredients }
 
     fun getShoppingIngredientCategoriesByStorageKey(): Map<String, String> {
         return groupedShoppingList.value
@@ -833,7 +830,7 @@ class MealPlannerViewModel(
     }
 
     fun buildShoppingListMessage(): String {
-        val ingredients = aggregatedShoppingList.value
+        val ingredients = getShoppingList()
         if (ingredients.isEmpty()) return "Список покупок пуст"
 
         val title = "Список покупок на ${dayCount.value} дн."
@@ -842,7 +839,8 @@ class MealPlannerViewModel(
     }
 
     fun createSharePdfFile(): File? {
-        val ingredients = aggregatedShoppingList.value
+        val ingredients = getShoppingList()
+        Log.d(TAG, "Creating share PDF. shoppingListSize=${ingredients.size}")
         if (ingredients.isEmpty()) return null
 
         val outputFile = File(
@@ -850,15 +848,20 @@ class MealPlannerViewModel(
             "shopping-list-share-${System.currentTimeMillis()}.pdf"
         )
 
-        outputFile.outputStream().use { output ->
-            writePdf(ingredients, output)
-        }
-        onAfterShareCompleted()
-        return outputFile
+        return runCatching {
+            outputFile.outputStream().use { output ->
+                writePdf(ingredients, output)
+            }
+            onAfterShareCompleted()
+            outputFile
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to create share PDF file", error)
+        }.getOrNull()
     }
 
     fun saveShoppingListPdfToUri(uri: Uri): Boolean {
-        val ingredients = aggregatedShoppingList.value
+        val ingredients = getShoppingList()
+        Log.d(TAG, "Saving shopping PDF. shoppingListSize=${ingredients.size}, uri=$uri")
         if (ingredients.isEmpty()) return false
 
         val resolver = getApplication<Application>().contentResolver
@@ -868,6 +871,8 @@ class MealPlannerViewModel(
             } ?: return false
             onAfterShareCompleted()
             true
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to save shopping PDF to uri=$uri", error)
         }.getOrDefault(false)
     }
 
@@ -1084,6 +1089,10 @@ class MealPlannerViewModel(
         } else {
             value.toString()
         }
+    }
+
+    companion object {
+        private const val TAG = "MealPlannerViewModel"
     }
 
     private fun detectSmartDefaultUnit(query: String): String? {
