@@ -218,15 +218,34 @@ class MealPlannerViewModel(
         mapOf(groupName to catalog)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    private data class ShoppingCatalogState(
+        val catalog: List<Ingredient>,
+        val groups: List<com.example.mealplanner.model.IngredientGroup>,
+        val hiddenKeys: Set<String>
+    )
+
+    private val shoppingCatalogState = combine(
+        ingredientCatalog,
+        ingredientGroups,
+        _hiddenShoppingIngredientKeys
+    ) { catalog, groups, hiddenKeys ->
+        ShoppingCatalogState(catalog, groups, hiddenKeys)
+    }
+
     val groupedShoppingList = combine(
         _meals,
         _weeklyPlan,
         _dayCount,
-        ingredientCatalog,
-        ingredientGroups,
-        _hiddenShoppingIngredientKeys
-    ) { meals, weeklyPlan, dayCount, catalog, groups, hiddenKeys ->
-        buildGroupedShoppingList(meals, weeklyPlan, dayCount, catalog, groups, hiddenKeys)
+        shoppingCatalogState
+    ) { meals, weeklyPlan, dayCount, shoppingState ->
+        buildGroupedShoppingList(
+            meals = meals,
+            weeklyPlan = weeklyPlan,
+            dayCount = dayCount,
+            ingredientCatalog = shoppingState.catalog,
+            ingredientGroups = shoppingState.groups,
+            hiddenIngredientKeys = shoppingState.hiddenKeys
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val aggregatedShoppingList = groupedShoppingList
