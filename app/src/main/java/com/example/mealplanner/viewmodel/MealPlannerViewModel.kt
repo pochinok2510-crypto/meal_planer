@@ -1093,6 +1093,22 @@ class MealPlannerViewModel(
 
     companion object {
         private const val TAG = "MealPlannerViewModel"
+
+        private val SMART_DEFAULT_PCS_KEYWORDS = listOf("egg", "eggs", "яйц")
+        private val SMART_DEFAULT_ML_KEYWORDS = listOf("milk", "молок")
+        private val SMART_DEFAULT_GRAMS_KEYWORDS = listOf("flour", "мук")
+
+        private const val KEY_MEAL_NAME = "add_meal_name"
+        private const val KEY_SELECTED_GROUP = "add_meal_group"
+        private const val KEY_MEAL_TYPE = "add_meal_type"
+        private const val KEY_ADD_MEAL_STEP = "add_meal_step"
+        private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
+        private const val KEY_INGREDIENT_SHEET_VISIBLE = "add_meal_ingredient_sheet_visible"
+        private const val KEY_INGREDIENT_SEARCH_QUERY = "add_meal_ingredient_search_query"
+        private const val KEY_INGREDIENT_UNIT_INPUT = "add_meal_ingredient_unit_input"
+        private const val KEY_INGREDIENT_QUANTITY_INPUT = "add_meal_ingredient_quantity_input"
+        private const val KEY_INGREDIENT_GROUP_ID = "add_meal_ingredient_group_id"
+        private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
     }
 
     private fun detectSmartDefaultUnit(query: String): String? {
@@ -1156,21 +1172,4 @@ class MealPlannerViewModel(
         }.getOrDefault(emptyList())
     }
 
-    companion object {
-        private val SMART_DEFAULT_PCS_KEYWORDS = listOf("egg", "eggs", "яйц")
-        private val SMART_DEFAULT_ML_KEYWORDS = listOf("milk", "молок")
-        private val SMART_DEFAULT_GRAMS_KEYWORDS = listOf("flour", "мук")
-
-        private const val KEY_MEAL_NAME = "add_meal_name"
-        private const val KEY_SELECTED_GROUP = "add_meal_group"
-        private const val KEY_MEAL_TYPE = "add_meal_type"
-        private const val KEY_ADD_MEAL_STEP = "add_meal_step"
-        private const val KEY_SELECTED_INGREDIENTS = "add_meal_selected_ingredients"
-        private const val KEY_INGREDIENT_SHEET_VISIBLE = "add_meal_ingredient_sheet_visible"
-        private const val KEY_INGREDIENT_SEARCH_QUERY = "add_meal_ingredient_search_query"
-        private const val KEY_INGREDIENT_UNIT_INPUT = "add_meal_ingredient_unit_input"
-        private const val KEY_INGREDIENT_QUANTITY_INPUT = "add_meal_ingredient_quantity_input"
-        private const val KEY_INGREDIENT_GROUP_ID = "add_meal_ingredient_group_id"
-        private const val KEY_ADD_MEAL_ERROR = "add_meal_error"
-    }
 }
