@@ -821,6 +821,20 @@ class MealPlannerViewModel(
         persistPlannerStateIfEnabled()
     }
 
+    fun checkAll() {
+        val allKeys = groupedShoppingList.value
+            .flatMap { group -> group.ingredients }
+            .map { ingredient -> ingredient.storageKey() }
+            .toSet()
+        _purchasedIngredientKeys.value = allKeys
+        persistPlannerStateIfEnabled()
+    }
+
+    fun uncheckAll() {
+        _purchasedIngredientKeys.value = emptySet()
+        persistPlannerStateIfEnabled()
+    }
+
     fun getShoppingList(): List<Ingredient> = groupedShoppingList.value.flatMap { it.ingredients }
 
     fun getShoppingIngredientCategoriesByStorageKey(): Map<String, String> {
