@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -56,7 +57,7 @@ import com.example.mealplanner.ui.presentation.LocalUiDensity
 import com.example.mealplanner.ui.presentation.toRussianUnitLabel
 import com.example.mealplanner.viewmodel.ShoppingGroup
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ShoppingListScreen(
     groupedIngredients: List<ShoppingGroup>,
@@ -138,7 +139,7 @@ fun ShoppingListScreen(
             Box(modifier = Modifier.weight(1f)) {
                 if (!hasIngredients) {
                     if (animationsEnabled) {
-                        androidx.compose.animation.AnimatedVisibility(
+                        AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
@@ -173,7 +174,7 @@ fun ShoppingListScreen(
                     }
 
                     if (animationsEnabled) {
-                        androidx.compose.animation.AnimatedVisibility(
+                        AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
