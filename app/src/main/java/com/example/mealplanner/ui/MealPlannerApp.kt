@@ -128,44 +128,50 @@ fun MealPlannerApp(
     }
 
     val destinations = listOf(Screen.Menu, Screen.AddMeal, Screen.WeeklyPlanner, Screen.ShoppingList, Screen.Settings)
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+    val bottomNavigationBar: @Composable () -> Unit = {
+        NavigationBar {
+            destinations.forEach { screen ->
+                NavigationBarItem(
+                    selected = currentRoute == screen.route,
+                    onClick = {
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    icon = { Text(iconFor(screen)) },
+                    label = { Text(labelFor(screen)) }
+                )
+            }
+        }
+    }
 
     ProvideUiDensity(densityMode = settings.densityMode) {
         Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-            TopAppBar(title = {
-                Text(
-                    when (currentRoute) {
-                        Screen.Menu.route -> "Меню"
-                        Screen.AddMeal.route -> "Добавить блюдо"
-                        Screen.WeeklyPlanner.route -> "План недели"
-                        Screen.ShoppingList.route -> "Список покупок"
-                        Screen.Settings.route -> "Настройки"
-                        else -> "Meal Planner"
-                    }
-                )
-            })
+            if (currentRoute != Screen.ShoppingList.route) {
+                TopAppBar(title = {
+                    Text(
+                        when (currentRoute) {
+                            Screen.Menu.route -> "Меню"
+                            Screen.AddMeal.route -> "Добавить блюдо"
+                            Screen.WeeklyPlanner.route -> "План недели"
+                            Screen.Settings.route -> "Настройки"
+                            else -> "Meal Planner"
+                        }
+                    )
+                })
+            }
         },
         bottomBar = {
-            NavigationBar {
-                destinations.forEach { screen ->
-                    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                    NavigationBarItem(
-                        selected = currentRoute == screen.route,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Text(iconFor(screen)) },
-                        label = { Text(labelFor(screen)) }
-                    )
-                }
+            if (currentRoute != Screen.ShoppingList.route) {
+                bottomNavigationBar()
             }
         }
     ) { padding ->
@@ -259,7 +265,8 @@ fun MealPlannerApp(
                         savePdfLauncher.launch("shopping-list-${System.currentTimeMillis()}.pdf")
                     },
                     onCheckAll = mealPlannerViewModel::checkAll,
-                    onUncheckAll = mealPlannerViewModel::uncheckAll
+                    onUncheckAll = mealPlannerViewModel::uncheckAll,
+                    bottomNavigationBar = bottomNavigationBar
                 )
             }
             composable(Screen.Settings.route) {
