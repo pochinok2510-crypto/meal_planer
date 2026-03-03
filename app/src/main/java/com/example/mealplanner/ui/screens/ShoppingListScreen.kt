@@ -32,7 +32,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,16 +74,33 @@ fun ShoppingListScreen(
     onUncheckAll: () -> Unit
 ) {
     val density = LocalUiDensity.current
-    val contentPadding = 16.dp * density.spacingMultiplier
-    val sectionSpacing = 12.dp * density.spacingMultiplier
-    val minCardHeight = 64.dp * density.cardHeightMultiplier
+    val contentPadding = 10.dp * density.spacingMultiplier
     var collapsedGroups by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var isControlsVisible by rememberSaveable { mutableStateOf(false) }
     val hasIngredients = groupedIngredients.any { it.ingredients.isNotEmpty() }
     val hasCollapsedGroups = groupedIngredients.any { it.groupId in collapsedGroups }
     val hasExpandedGroups = groupedIngredients.any { it.groupId !in collapsedGroups }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        topBar = {
+            SmallTopAppBar(
+                title = { Text("Список покупок") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Text("←")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { isControlsVisible = !isControlsVisible }) {
+                        Text("⚙")
+                    }
+                    IconButton(onClick = onClear) {
+                        Text("🗑")
+                    }
+                }
+            )
+        },
         bottomBar = {
             ShoppingActionsBar(
                 onSend = onSend,
@@ -94,127 +113,131 @@ fun ShoppingListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(sectionSpacing)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = minCardHeight),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            AnimatedVisibility(
+                visible = isControlsVisible,
+                enter = expandVertically(tween(220)) + fadeIn(tween(180)),
+                exit = shrinkVertically(tween(180)) + fadeOut(tween(120))
             ) {
-                Text("Дней: $dayCount", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onDayCountChange(dayCount - 1) }) { Text("-1") }
-                    Button(onClick = { onDayCountChange(dayCount + 1) }) { Text("+1") }
-                }
+                ShoppingControlsPanel(
+                    dayCount = dayCount,
+                    hasIngredients = hasIngredients,
+                    hasExpandedGroups = hasExpandedGroups,
+                    hasCollapsedGroups = hasCollapsedGroups,
+                    onDayCountChange = onDayCountChange,
+                    onCheckAll = onCheckAll,
+                    onUncheckAll = onUncheckAll,
+                    onCollapseAll = {
+                        collapsedGroups = groupedIngredients.map { it.groupId }.toSet()
+                    },
+                    onExpandAll = { collapsedGroups = emptySet() }
+                )
             }
 
-            if (hasIngredients) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TextButton(onClick = onCheckAll, modifier = Modifier.weight(1f)) {
-                        Text("✅ Отметить всё")
+            Box(modifier = Modifier.weight(1f)) {
+                if (!hasIngredients) {
+                    if (animationsEnabled) {
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
+                        ) {
+                            Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
+                        }
+                    } else {
+                        Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
                     }
-                    TextButton(onClick = onUncheckAll, modifier = Modifier.weight(1f)) {
-                        Text("⬜ Снять всё")
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TextButton(
-                        onClick = {
-                            collapsedGroups = groupedIngredients.map { it.groupId }.toSet()
-                        },
-                        enabled = hasExpandedGroups,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Свернуть все")
-                    }
-                    TextButton(
-                        onClick = { collapsedGroups = emptySet() },
-                        enabled = hasCollapsedGroups,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Развернуть все")
-                    }
-                }
-            }
-
-            if (animationsEnabled) {
-                AnimatedVisibility(
-                    visible = !hasIngredients,
-                    enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
-                    exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-                ) {
-                    Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
-                }
-            } else if (!hasIngredients) {
-                Text("Список покупок пуст.", style = MaterialTheme.typography.bodyLarge)
-            }
-
-            if (animationsEnabled) {
-                AnimatedVisibility(
-                    visible = hasIngredients,
-                    enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
-                    exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(180))
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(groupedIngredients, key = { it.groupId }) { group ->
-                            CategorySection(
-                                group = group,
-                                purchasedIngredientKeys = purchasedIngredientKeys,
-                                isCollapsed = group.groupId in collapsedGroups,
-                                onToggleCollapsed = {
-                                    collapsedGroups = if (group.groupId in collapsedGroups) {
-                                        collapsedGroups - group.groupId
-                                    } else {
-                                        collapsedGroups + group.groupId
-                                    }
-                                },
-                                onIngredientPurchasedChange = onIngredientPurchasedChange,
-                                onRemoveIngredient = onRemoveIngredient
-                            )
+                } else {
+                    val listContent: @Composable () -> Unit = {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(groupedIngredients, key = { it.groupId }) { group ->
+                                CategorySection(
+                                    group = group,
+                                    purchasedIngredientKeys = purchasedIngredientKeys,
+                                    isCollapsed = group.groupId in collapsedGroups,
+                                    onToggleCollapsed = {
+                                        collapsedGroups = if (group.groupId in collapsedGroups) {
+                                            collapsedGroups - group.groupId
+                                        } else {
+                                            collapsedGroups + group.groupId
+                                        }
+                                    },
+                                    onIngredientPurchasedChange = onIngredientPurchasedChange,
+                                    onRemoveIngredient = onRemoveIngredient
+                                )
+                            }
                         }
                     }
-                }
-            } else if (hasIngredients) {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(groupedIngredients, key = { it.groupId }) { group ->
-                        CategorySection(
-                            group = group,
-                            purchasedIngredientKeys = purchasedIngredientKeys,
-                            isCollapsed = group.groupId in collapsedGroups,
-                            onToggleCollapsed = {
-                                collapsedGroups = if (group.groupId in collapsedGroups) {
-                                    collapsedGroups - group.groupId
-                                } else {
-                                    collapsedGroups + group.groupId
-                                }
-                            },
-                            onIngredientPurchasedChange = onIngredientPurchasedChange,
-                            onRemoveIngredient = onRemoveIngredient
-                        )
+
+                    if (animationsEnabled) {
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
+                        ) {
+                            listContent()
+                        }
+                    } else {
+                        listContent()
                     }
                 }
             }
+        }
+    }
+}
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onClear, modifier = Modifier.weight(1f)) {
-                    Text("🗑 Очистить")
+@Composable
+private fun ShoppingControlsPanel(
+    dayCount: Int,
+    hasIngredients: Boolean,
+    hasExpandedGroups: Boolean,
+    hasCollapsedGroups: Boolean,
+    onDayCountChange: (Int) -> Unit,
+    onCheckAll: () -> Unit,
+    onUncheckAll: () -> Unit,
+    onCollapseAll: () -> Unit,
+    onExpandAll: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Дней: $dayCount", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { onDayCountChange(dayCount - 1) }) { Text("-1") }
+            TextButton(onClick = { onDayCountChange(dayCount + 1) }) { Text("+1") }
+        }
+
+        if (hasIngredients) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(onClick = onCheckAll, modifier = Modifier.weight(1f)) {
+                    Text("Отметить всё")
                 }
-                Button(onClick = onBack, modifier = Modifier.weight(1f)) {
-                    Text("← Назад")
+                TextButton(onClick = onUncheckAll, modifier = Modifier.weight(1f)) {
+                    Text("Снять всё")
+                }
+                TextButton(
+                    onClick = onExpandAll,
+                    enabled = hasCollapsedGroups,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Развернуть")
+                }
+                TextButton(
+                    onClick = onCollapseAll,
+                    enabled = hasExpandedGroups,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Свернуть")
                 }
             }
         }
@@ -241,10 +264,10 @@ private fun ShoppingActionsBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = onSend, modifier = Modifier.weight(1f)) {
-                    Text("📤 Отправить")
+                    Text("Отправить")
                 }
-                Button(onClick = onSavePdf, modifier = Modifier.weight(1f)) {
-                    Text("💾 Сохранить PDF")
+                OutlinedButton(onClick = onSavePdf, modifier = Modifier.weight(1f)) {
+                    Text("PDF")
                 }
             }
         }
