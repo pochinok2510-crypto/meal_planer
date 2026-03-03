@@ -257,7 +257,9 @@ fun MealPlannerApp(
                     },
                     onSavePdf = {
                         savePdfLauncher.launch("shopping-list-${System.currentTimeMillis()}.pdf")
-                    }
+                    },
+                    onCheckAll = mealPlannerViewModel::checkAll,
+                    onUncheckAll = mealPlannerViewModel::uncheckAll
                 )
             }
             composable(Screen.Settings.route) {
