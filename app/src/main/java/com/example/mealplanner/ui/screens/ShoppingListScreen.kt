@@ -115,7 +115,7 @@ fun ShoppingListScreen(
                 .padding(innerPadding)
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        ) column@ {
             AnimatedVisibility(
                 visible = isControlsVisible,
                 enter = expandVertically(tween(220)) + fadeIn(tween(180)),
@@ -139,7 +139,7 @@ fun ShoppingListScreen(
             Box(modifier = Modifier.weight(1f)) {
                 if (!hasIngredients) {
                     if (animationsEnabled) {
-                        AnimatedVisibility(
+                        this@column.AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
@@ -174,7 +174,7 @@ fun ShoppingListScreen(
                     }
 
                     if (animationsEnabled) {
-                        AnimatedVisibility(
+                        this@column.AnimatedVisibility(
                             visible = true,
                             enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
                         ) {
