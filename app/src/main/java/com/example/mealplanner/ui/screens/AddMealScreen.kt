@@ -391,39 +391,6 @@ private fun DraftIngredientCard(
         }
     }
 
-    groupToDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { groupToDelete = null },
-            title = { Text("Удалить группу?") },
-            text = { Text("Все ингредиенты из '${target.name}' будут перемещены в '${IngredientRepository.DEFAULT_GROUP_NAME}'.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteGroup(target.id)
-                    groupToDelete = null
-                }) { Text("Удалить") }
-            },
-            dismissButton = {
-                TextButton(onClick = { groupToDelete = null }) { Text("Отмена") }
-            }
-        )
-    }
-
-    ingredientToDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { ingredientToDelete = null },
-            title = { Text("Удалить ингредиент?") },
-            text = { Text(target.name) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteIngredient(target.id)
-                    ingredientToDelete = null
-                }) { Text("Удалить") }
-            },
-            dismissButton = {
-                TextButton(onClick = { ingredientToDelete = null }) { Text("Отмена") }
-            }
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
